@@ -17,11 +17,11 @@ import (
 type Handler interface {
 	OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error)
 	OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error)
-	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) chan types.StreamEvent
+	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent
 	OnCancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error)
 	OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error)
 	OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error)
-	OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) chan types.StreamEvent
+	OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent
 }
 
 type DefaultHandler struct {
@@ -140,8 +140,8 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 	return rg.ConsumeAndEmit(ctx, consumer)
 }
 
-// CancelTask attempts to cancel the task manged by agentExecutor
-func (d *DefaultHandler) CancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error) {
+// OnCancelTask attempts to cancel the task manged by agentExecutor
+func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error) {
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
 		return nil, err
@@ -215,7 +215,7 @@ func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, pa
 	return &types.TaskPushNotificationConfig{TaskId: params.Id, Config: config}, nil
 }
 
-func (d *DefaultHandler) OnReSubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent {
+func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent {
 	errCh := make(chan types.StreamEvent, 1)
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
