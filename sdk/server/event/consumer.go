@@ -7,28 +7,38 @@ import (
 	"github.com/yumosx/a2a-go/sdk/types"
 )
 
+// Consumer to read events form the agent event queue
 type Consumer struct {
 	queue *Queue
+	err   <-chan error
 }
 
-func NewConsumer(queue *Queue) *Consumer {
-	return &Consumer{queue: queue}
+func NewConsumer(queue *Queue, errCh <-chan error) *Consumer {
+	return &Consumer{queue: queue, err: errCh}
 }
 
+// ConsumeOne consume one event from the agent queue non-blocking
 func (c *Consumer) ConsumeOne(ctx context.Context) types.StreamEvent {
 	return c.queue.DequeueNoWait(ctx)
 }
 
+// ConsumeAll consume all the agents streaming events form agent
 func (c *Consumer) ConsumeAll(ctx context.Context) <-chan types.StreamEvent {
-	eventCh := make(chan types.StreamEvent, 1024)
+	eventCh := make(chan types.StreamEvent, 10)
 	go func() {
-		newCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+		defer close(eventCh)
+		newCtx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		for {
 			select {
 			case <-ctx.Done():
 				eventCh <- types.StreamEvent{Err: ctx.Err()}
 				return
+			case err, ok := <-c.err:
+				if err != nil && !ok {
+					eventCh <- types.StreamEvent{Err: err}
+					return
+				}
 			default:
 			}
 			event := c.queue.DequeueWait(newCtx)
@@ -37,6 +47,7 @@ func (c *Consumer) ConsumeAll(ctx context.Context) <-chan types.StreamEvent {
 				return
 			}
 			if event.Done() {
+				eventCh <- event
 				return
 			}
 			eventCh <- event

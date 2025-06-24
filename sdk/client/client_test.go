@@ -33,7 +33,7 @@ func (c *ClientSuite) TestSendMessage() {
 		want types.SendMessageResponse
 	}{
 		{
-			name: "发送消息",
+			name: "send message",
 			req: types.SendMessageRequest{
 				Method: types.MessageSend,
 			},
@@ -65,7 +65,7 @@ func (c *ClientSuite) TestGetTask() {
 	testcases := []struct {
 		name string
 		req  types.GetTaskRequest
-		want types.GetTaskResponse
+		want types.GetTaskSuccessResponse
 	}{
 		{
 			name: "获取对应的task",

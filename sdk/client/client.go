@@ -96,22 +96,22 @@ func (c *A2AClient) GetTask(
 	ctx context.Context,
 	request types.GetTaskRequest,
 	options map[string]string,
-) (types.GetTaskResponse, error) {
+) (types.GetTaskSuccessResponse, error) {
 	if request.Id == "" {
 		request.Id = uuid.New().String()
 	}
 	payload, err := json.Marshal(request)
 	if err != nil {
-		return types.GetTaskResponse{}, err
+		return types.GetTaskSuccessResponse{}, err
 	}
 	resp, err := c.sendRequest(ctx, payload, options)
 	if err != nil {
-		return types.GetTaskResponse{}, err
+		return types.GetTaskSuccessResponse{}, err
 	}
-	var response types.GetTaskResponse
+	var response types.GetTaskSuccessResponse
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
-		return types.GetTaskResponse{}, err
+		return types.GetTaskSuccessResponse{}, err
 	}
 	return response, nil
 }
