@@ -10,6 +10,8 @@ import (
 	"github.com/yumosx/a2a-go/sdk/server/event"
 	"github.com/yumosx/a2a-go/sdk/server/execution"
 	"github.com/yumosx/a2a-go/sdk/server/tasks"
+	"github.com/yumosx/a2a-go/sdk/server/tasks/aggregator"
+	"github.com/yumosx/a2a-go/sdk/server/tasks/manager"
 	"github.com/yumosx/a2a-go/sdk/types"
 )
 
@@ -25,11 +27,11 @@ type Handler interface {
 }
 
 type DefaultHandler struct {
-	manger           *tasks.TaskManager
+	manger           *manager.TaskManager
 	store            tasks.TaskStore
 	queueManger      event.QueueManager
 	executor         execution.AgentExecutor
-	resultAggregator *tasks.ResultAggregator
+	resultAggregator *aggregator.ResultAggregator
 	pushNotifier     tasks.PushNotifier
 }
 
@@ -51,13 +53,13 @@ func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryPa
 }
 
 func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error) {
-	manger := tasks.NewTaskManger(
+	taskManger := manager.NewTaskManger(
 		d.store,
-		tasks.WithTaskId(params.Message.TaskID),
-		tasks.WithContextId(params.Message.ContextID),
-		tasks.WithInitMessage(params.Message),
+		manager.WithTaskId(params.Message.TaskID),
+		manager.WithContextId(params.Message.ContextID),
+		manager.WithInitMessage(params.Message),
 	)
-	task, err := manger.GetTask(ctx)
+	task, err := taskManger.GetTask(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +69,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	if task.Status.State == types.COMPLETED {
 		return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
 	}
-	task = manger.UpdateWithMessage(params.Message, task)
+	task = taskManger.UpdateWithMessage(params.Message, task)
 
 	reqContext := execution.NewRequestContext(
 		execution.WithParams(params),
@@ -88,8 +90,8 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 		return nil, err
 	}
 
-	resultAggregator := tasks.NewResultAggregator(manger, nil)
-	ev, _, err := resultAggregator.ConsumeAndBreakOnInterrupt(ctx, consumer)
+	resultAggregator := aggregator.NewResultAggregator(taskManger)
+	ev, err := resultAggregator.ConsumeAndBreakOnInterrupt(ctx, consumer)
 	if err != nil {
 		return nil, err
 	}
@@ -103,14 +105,14 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent {
 	ch := make(chan types.StreamEvent, 1)
 
-	manger := tasks.NewTaskManger(
+	taskManger := manager.NewTaskManger(
 		d.store,
-		tasks.WithTaskId(params.Message.TaskID),
-		tasks.WithContextId(params.Message.ContextID),
-		tasks.WithInitMessage(params.Message),
+		manager.WithTaskId(params.Message.TaskID),
+		manager.WithContextId(params.Message.ContextID),
+		manager.WithInitMessage(params.Message),
 	)
 
-	task, err := manger.GetTask(ctx)
+	task, err := taskManger.GetTask(ctx)
 	if err != nil {
 		ch <- types.StreamEvent{Err: err}
 		return ch
@@ -126,7 +128,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 	}
 	defer queue.Close()
 
-	rg := tasks.NewResultAggregator(manger, nil)
+	rg := aggregator.NewResultAggregator(taskManger)
 	reqCtx := execution.NewRequestContext(
 		execution.WithParams(params),
 		execution.WithTaskId(task.Id),
@@ -147,13 +149,13 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 		return nil, err
 	}
 
-	manger := tasks.NewTaskManger(
+	taskManger := manager.NewTaskManger(
 		d.store,
-		tasks.WithTaskId(task.Id),
-		tasks.WithContextId(task.ContextId),
+		manager.WithTaskId(task.Id),
+		manager.WithContextId(task.ContextId),
 	)
 
-	rg := tasks.NewResultAggregator(manger, nil)
+	rg := aggregator.NewResultAggregator(taskManger)
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
 	if err != nil {
 		return nil, err
@@ -175,7 +177,7 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 	if result.EventType() == "task" {
 		return result.(*types.Task), nil
 	}
-	return nil, errors.New("agent did not return valid response for cancel")
+	return nil, errs.InValidResponse
 }
 
 func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error) {
@@ -228,12 +230,12 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.T
 		return errCh
 	}
 
-	manger := tasks.NewTaskManger(
+	manger := manager.NewTaskManger(
 		d.store,
-		tasks.WithTaskId(task.Id),
-		tasks.WithContextId(task.ContextId),
+		manager.WithTaskId(task.Id),
+		manager.WithContextId(task.ContextId),
 	)
-	rg := tasks.NewResultAggregator(manger, nil)
+	rg := aggregator.NewResultAggregator(manger)
 	queue, err := d.queueManger.Tap(ctx, task.Id)
 	if err != nil {
 		errCh <- types.StreamEvent{Err: err}
@@ -262,7 +264,7 @@ func (fn HandlerOptionFunc) Option(d *DefaultHandler) {
 	fn(d)
 }
 
-func WithTaskManger(taskManger *tasks.TaskManager) HandlerOption {
+func WithTaskManger(taskManger *manager.TaskManager) HandlerOption {
 	return HandlerOptionFunc(func(d *DefaultHandler) {
 		d.manger = taskManger
 	})
@@ -274,7 +276,7 @@ func WithQueueManger(queueManger event.QueueManager) HandlerOption {
 	})
 }
 
-func WithResultAggregator(rg *tasks.ResultAggregator) HandlerOption {
+func WithResultAggregator(rg *aggregator.ResultAggregator) HandlerOption {
 	return HandlerOptionFunc(func(d *DefaultHandler) {
 		d.resultAggregator = rg
 	})

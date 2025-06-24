@@ -1,25 +1,33 @@
-package tasks
+package aggregator
 
 import (
 	"context"
 
+	"github.com/yumosx/a2a-go/internal/errs"
 	"github.com/yumosx/a2a-go/sdk/server/event"
+	"github.com/yumosx/a2a-go/sdk/server/tasks/manager"
 	"github.com/yumosx/a2a-go/sdk/types"
 )
 
 // ResultAggregator is used to process the event streams from an AgentExecutor
 type ResultAggregator struct {
-	Manager *TaskManager
-	Message *types.Message
+	manager   *manager.TaskManager
+	message   *types.Message
+	batchSize int64
 }
 
-func NewResultAggregator(taskManger *TaskManager, initMessage *types.Message) *ResultAggregator {
-	return &ResultAggregator{Manager: taskManger, Message: initMessage}
+func NewResultAggregator(taskManger *manager.TaskManager, options ...ResultAggregatorOption) *ResultAggregator {
+	rg := &ResultAggregator{manager: taskManger}
+	for _, opt := range options {
+		opt.Option(rg)
+	}
+	return rg
 }
 
 // ConsumeAndEmit process the event stream from the consumer, updates the task store
 func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.Consumer) <-chan types.StreamEvent {
-	events := make(chan types.StreamEvent, 1024)
+	events := make(chan types.StreamEvent, 10)
+	allEvents := consumer.ConsumeAll(ctx)
 	go func() {
 		defer close(events)
 		for {
@@ -27,7 +35,7 @@ func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.C
 			case <-ctx.Done():
 				events <- types.StreamEvent{Err: ctx.Err()}
 				return
-			case e, ok := <-consumer.ConsumeAll(ctx):
+			case e, ok := <-allEvents:
 				if !ok {
 					return
 				}
@@ -39,7 +47,7 @@ func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.C
 					events <- e
 					return
 				}
-				ev, err := r.Manager.Process(ctx, e.Event)
+				ev, err := r.manager.Process(ctx, e.Event)
 				if err != nil {
 					events <- types.StreamEvent{Err: err}
 					return
@@ -66,7 +74,7 @@ func (r *ResultAggregator) ConsumeAll(ctx context.Context, consumer *event.Consu
 				return nil, ev.Err
 			}
 			if ev.Done() {
-				task, err := r.Manager.GetTask(ctx)
+				task, err := r.manager.GetTask(ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -74,10 +82,10 @@ func (r *ResultAggregator) ConsumeAll(ctx context.Context, consumer *event.Consu
 			}
 			if ev.EventType() == "message" {
 				msg := ev.Event.(*types.Message)
-				r.Message = msg
+				r.message = msg
 				return msg, nil
 			}
-			_, err := r.Manager.Process(ctx, ev.Event)
+			_, err := r.manager.Process(ctx, ev.Event)
 			if err != nil {
 				return nil, err
 			}
@@ -86,50 +94,55 @@ func (r *ResultAggregator) ConsumeAll(ctx context.Context, consumer *event.Consu
 }
 
 // ConsumeAndBreakOnInterrupt process the event stream until completion or an interruptible state is encountered
-func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, consumer *event.Consumer) (types.Event, bool, error) {
+func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, consumer *event.Consumer) (types.Event, error) {
 	events := consumer.ConsumeAll(ctx)
 	var result types.Event
 
 	for {
 		select {
 		case <-ctx.Done():
-			return nil, false, ctx.Err()
+			return nil, ctx.Err()
 		case e, ok := <-events:
 			if !ok {
-				task, err := r.Manager.GetTask(ctx)
+				task, err := r.manager.GetTask(ctx)
 				result = task
-				return result, false, err
+				return result, err
 			}
 			if e.Err != nil {
-				return nil, false, e.Err
+				return nil, e.Err
+			}
+			if r.IsAuthRequired(e.Event) {
+				r.continueConsume(ctx, events)
+				return nil, errs.AuthRequired
 			}
 			if e.Done() {
-				task, err := r.Manager.GetTask(ctx)
+				task, err := r.manager.GetTask(ctx)
 				result = task
-				return result, false, err
+				return result, err
 			}
-			_, err := r.Manager.Process(ctx, e.Event)
+			_, err := r.manager.Process(ctx, e.Event)
 			if err != nil {
-				return nil, false, err
-			}
-
-			if e.EventType() == "update_event" {
-				updateEvent := e.Event.(*types.TaskStatusUpdateEvent)
-				if updateEvent.Status.State == types.AUTH_REQUIRED {
-					r.continueConsume(ctx, events)
-					return nil, true, err
-				}
-			}
-
-			if e.EventType() == "task" {
-				taskEvent := e.Event.(*types.Task)
-				if taskEvent.Status.State == types.AUTH_REQUIRED {
-					r.continueConsume(ctx, events)
-					return nil, true, err
-				}
+				return nil, err
 			}
 		}
 	}
+}
+
+func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
+	if event.EventType() == "status_update" {
+		updateEvent := event.(*types.TaskStatusUpdateEvent)
+		if updateEvent.Status.State == types.AUTH_REQUIRED {
+			return true
+		}
+	}
+
+	if event.EventType() == "task" {
+		taskEvent := event.(*types.Task)
+		if taskEvent.Status.State == types.AUTH_REQUIRED {
+			return true
+		}
+	}
+	return false
 }
 
 // continueConsume processing an event stream in backhand task
@@ -146,11 +159,27 @@ func (r *ResultAggregator) continueConsume(ctx context.Context, events <-chan ty
 				if ev.Done() {
 					return
 				}
-				_, err := r.Manager.Process(ctx, ev.Event)
+				_, err := r.manager.Process(ctx, ev.Event)
 				if err != nil {
 					return
 				}
 			}
 		}
 	}()
+}
+
+type ResultAggregatorOption interface {
+	Option(rg *ResultAggregator)
+}
+
+type ResultAggregatorOptionFunc func(rg *ResultAggregator)
+
+func (fn ResultAggregatorOptionFunc) Option(rg *ResultAggregator) {
+	fn(rg)
+}
+
+func WithMessage(message *types.Message) ResultAggregatorOption {
+	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
+		rg.message = message
+	})
 }

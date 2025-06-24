@@ -1,10 +1,11 @@
-package tasks
+package manager
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
+	"github.com/yumosx/a2a-go/sdk/server/tasks"
 	"github.com/yumosx/a2a-go/sdk/types"
 )
 
@@ -12,7 +13,7 @@ import (
 type TaskManager struct {
 	taskId      string
 	contextId   string
-	store       TaskStore
+	store       tasks.TaskStore
 	initMessage *types.Message
 	currentTask *types.Task
 }
@@ -45,7 +46,7 @@ func WithInitMessage(message *types.Message) TaskManagerOption {
 	})
 }
 
-func NewTaskManger(store TaskStore, opts ...TaskManagerOption) *TaskManager {
+func NewTaskManger(store tasks.TaskStore, opts ...TaskManagerOption) *TaskManager {
 	manger := &TaskManager{store: store}
 
 	for _, opt := range opts {
