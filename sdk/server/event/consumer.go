@@ -2,7 +2,6 @@ package event
 
 import (
 	"context"
-	"time"
 
 	"github.com/yumosx/a2a-go/sdk/types"
 )
@@ -27,8 +26,6 @@ func (c *Consumer) ConsumeAll(ctx context.Context) <-chan types.StreamEvent {
 	eventCh := make(chan types.StreamEvent, 10)
 	go func() {
 		defer close(eventCh)
-		newCtx, cancel := context.WithTimeout(ctx, time.Minute)
-		defer cancel()
 		for {
 			select {
 			case <-ctx.Done():
@@ -41,7 +38,7 @@ func (c *Consumer) ConsumeAll(ctx context.Context) <-chan types.StreamEvent {
 				}
 			default:
 			}
-			event := c.queue.DequeueWait(newCtx)
+			event := c.queue.DequeueWait(ctx)
 			if event.Err != nil {
 				eventCh <- event
 				return
