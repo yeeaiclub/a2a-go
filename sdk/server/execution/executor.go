@@ -24,7 +24,7 @@ import (
 // executing tasks based on requests and publishing updates to an event queue.
 type AgentExecutor interface {
 	// Execute the agent's logic for a given request context
-	Execute(ctx context.Context, reqContext *RequestContext, queue *event.Queue) error
+	Execute(ctx context.Context, requestContext *RequestContext, queue *event.Queue) error
 	// Cancel request the agent to cancel an ongoing task
 	Cancel(ctx context.Context, requestContext *RequestContext, queue *event.Queue) error
 }

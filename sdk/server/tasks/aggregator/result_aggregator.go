@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/yumosx/a2a-go/internal/errs"
+	log "github.com/yumosx/a2a-go/internal/logger"
 	"github.com/yumosx/a2a-go/sdk/server/event"
 	"github.com/yumosx/a2a-go/sdk/server/tasks/manager"
 	"github.com/yumosx/a2a-go/sdk/types"
@@ -27,7 +28,7 @@ import (
 type ResultAggregator struct {
 	manager   *manager.TaskManager
 	message   *types.Message
-	batchSize int64
+	batchSize int
 }
 
 func NewResultAggregator(taskManger *manager.TaskManager, options ...ResultAggregatorOption) *ResultAggregator {
@@ -40,9 +41,9 @@ func NewResultAggregator(taskManger *manager.TaskManager, options ...ResultAggre
 
 // ConsumeAndEmit process the event stream from the consumer, updates the task store
 func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.Consumer) <-chan types.StreamEvent {
-	events := make(chan types.StreamEvent, 10)
-	allEvents := consumer.ConsumeAll(ctx)
+	events := make(chan types.StreamEvent, r.batchSize)
 	go func() {
+		allEvents := consumer.ConsumeAll(ctx)
 		defer close(events)
 		for {
 			select {
@@ -146,6 +147,7 @@ func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
 	if event.EventType() == "status_update" {
 		updateEvent := event.(*types.TaskStatusUpdateEvent)
 		if updateEvent.Status.State == types.AUTH_REQUIRED {
+			log.Debug("Encountered an auth-required task: breaking synchronous message/send flow.")
 			return true
 		}
 	}
@@ -153,6 +155,7 @@ func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
 	if event.EventType() == "task" {
 		taskEvent := event.(*types.Task)
 		if taskEvent.Status.State == types.AUTH_REQUIRED {
+			log.Debug("Encountered an auth-required task: breaking synchronous message/send flow.")
 			return true
 		}
 	}
@@ -195,5 +198,11 @@ func (fn ResultAggregatorOptionFunc) Option(rg *ResultAggregator) {
 func WithMessage(message *types.Message) ResultAggregatorOption {
 	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
 		rg.message = message
+	})
+}
+
+func WithBatchSize(batch int) ResultAggregatorOptionFunc {
+	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
+		rg.batchSize = batch
 	})
 }

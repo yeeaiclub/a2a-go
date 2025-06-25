@@ -83,6 +83,14 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	if task.Status.State == types.COMPLETED {
 		return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
 	}
+
+	if d.shouldAddPushInfo(params) {
+		err = d.pushNotifier.SetInfo(ctx, task.Id, params.Configuration.PushNotificationConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	task = taskManger.UpdateWithMessage(params.Message, task)
 
 	reqContext := execution.NewRequestContext(
@@ -140,9 +148,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 		ch <- types.StreamEvent{Err: err}
 		return ch
 	}
-	defer queue.Close()
 
-	rg := aggregator.NewResultAggregator(taskManger)
 	reqCtx := execution.NewRequestContext(
 		execution.WithParams(params),
 		execution.WithTaskId(task.Id),
@@ -153,7 +159,9 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 	errCh := d.execute(ctx, reqCtx, queue)
 	consumer := event.NewConsumer(queue, errCh)
 
-	return rg.ConsumeAndEmit(ctx, consumer)
+	rg := aggregator.NewResultAggregator(taskManger)
+	events := rg.ConsumeAndEmit(ctx, consumer)
+	return events
 }
 
 // OnCancelTask attempts to cancel the task manged by agentExecutor
@@ -174,14 +182,14 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 	if err != nil {
 		return nil, err
 	}
-	defer queue.Close()
-
 	if queue == nil {
 		queue = event.NewQueue(0)
+		defer queue.Close()
 	}
+	defer queue.Close()
 
 	reqCtx := execution.NewRequestContext()
-	done := d.execute(ctx, reqCtx, queue)
+	done := d.cancel(ctx, reqCtx, queue)
 	consumer := event.NewConsumer(queue, done)
 	result, err := rg.ConsumeAll(ctx, consumer)
 	if err != nil {
@@ -266,6 +274,21 @@ func (d *DefaultHandler) execute(ctx context.Context, reqCtx *execution.RequestC
 		ch <- d.executor.Execute(ctx, reqCtx, queue)
 	}()
 	return ch
+}
+
+func (d *DefaultHandler) cancel(ctx context.Context, reqCtx *execution.RequestContext, queue *event.Queue) chan error {
+	ch := make(chan error, 1)
+	go func() {
+		defer close(ch)
+		ch <- d.executor.Cancel(ctx, reqCtx, queue)
+	}()
+	return ch
+}
+
+func (d *DefaultHandler) shouldAddPushInfo(params types.MessageSendParam) bool {
+	return d.pushNotifier != nil &&
+		params.Configuration != nil &&
+		params.Configuration.PushNotificationConfig != nil
 }
 
 type HandlerOption interface {

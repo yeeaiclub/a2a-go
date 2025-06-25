@@ -57,11 +57,13 @@ func (c *Consumer) ConsumeAll(ctx context.Context) <-chan types.StreamEvent {
 				eventCh <- event
 				return
 			}
-			if event.Done() {
+			if event.Event != nil && event.Done() {
 				eventCh <- event
 				return
 			}
-			eventCh <- event
+			if event.Event != nil {
+				eventCh <- event
+			}
 		}
 	}()
 	return eventCh

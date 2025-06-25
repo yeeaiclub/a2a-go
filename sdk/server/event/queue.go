@@ -17,6 +17,7 @@ package event
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/yumosx/a2a-go/internal/errs"
 	"github.com/yumosx/a2a-go/sdk/types"
@@ -26,7 +27,7 @@ type Queue struct {
 	sync.Mutex
 	cap      int
 	queue    chan types.Event
-	closed   bool
+	closed   atomic.Bool
 	children []*Queue
 }
 
@@ -43,12 +44,6 @@ func NewQueue(size int) *Queue {
 }
 
 func (q *Queue) DequeueWait(ctx context.Context) types.StreamEvent {
-	q.Lock()
-	defer q.Unlock()
-	if q.closed {
-		return types.StreamEvent{Err: errs.QueueClosed}
-	}
-
 	select {
 	case <-ctx.Done():
 		return types.StreamEvent{Err: ctx.Err()}
@@ -61,13 +56,6 @@ func (q *Queue) DequeueWait(ctx context.Context) types.StreamEvent {
 }
 
 func (q *Queue) DequeueNoWait(ctx context.Context) types.StreamEvent {
-	q.Lock()
-	defer q.Unlock()
-
-	if q.closed || len(q.queue) == 0 {
-		return types.StreamEvent{Err: errs.QueueClosed}
-	}
-
 	select {
 	case <-ctx.Done():
 		return types.StreamEvent{Err: ctx.Err()}
@@ -82,11 +70,6 @@ func (q *Queue) DequeueNoWait(ctx context.Context) types.StreamEvent {
 }
 
 func (q *Queue) Enqueue(event types.Event) {
-	q.Lock()
-	defer q.Unlock()
-	if q.closed {
-		return
-	}
 	select {
 	case q.queue <- event:
 		for _, ch := range q.children {
@@ -98,12 +81,7 @@ func (q *Queue) Enqueue(event types.Event) {
 }
 
 func (q *Queue) Close() {
-	q.Lock()
-	defer q.Unlock()
-	if q.closed {
-		return
-	}
-	q.closed = true
+	q.closed.Store(true)
 	close(q.queue)
 	for _, ch := range q.children {
 		ch.Close()

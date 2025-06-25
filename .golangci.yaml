@@ -1,4 +1,4 @@
-# Copyright 2025 yumosx
+# Copyright 2021 ecodeclub
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Check License Lines
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
-    branches: [main,dev]
-    paths-ignore:
-      - '.docs/**'
-      - '**.md'
-      - '*mock*.go'
+version: "2"
 
-jobs:
-  check-license-lines:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@master
-      - name: Check License Lines
-        uses: kt3k/license_checker@v1.0.6
-        timeout-minutes: 5
+linters:
+  default: standard
+  enable:
+    - cyclop
+    - gocritic
+    - gosec
+    - ineffassign
+    - misspell
+    - prealloc
+    - unconvert
+    - unparam
+    - whitespace
+
+formatters:
+  enable:
+    - gofumpt
+    - goimports

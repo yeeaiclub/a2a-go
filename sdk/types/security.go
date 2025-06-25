@@ -41,6 +41,6 @@ type In string
 
 const (
 	InCookie In = "cookie"
-	InHeader    = "header"
-	InQuery     = "query"
+	InHeader In = "header"
+	InQuery  In = "query"
 )

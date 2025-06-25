@@ -79,8 +79,8 @@ func (c *A2AClient) SendMessage(
 	request types.SendMessageRequest,
 	options map[string]string,
 ) (types.SendMessageResponse, error) {
-	if request.Id == "" {
-		request.Id = uuid.New().String()
+	if request.ID == "" {
+		request.ID = uuid.New().String()
 	}
 
 	payload, err := json.Marshal(request)

@@ -66,6 +66,15 @@ type Task struct {
 	Artifacts []Artifact     `json:"artifacts,omitempty"`
 }
 
+type Artifact struct {
+	ArtifactId  string         `json:"artifact_id,omitempty"`
+	Description string         `json:"description,omitempty"`
+	Extensions  []string       `json:"extension,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	Name        string         `json:"name,omitempty"`
+	Parts       []Part         `json:"parts,omitempty"`
+}
+
 func (t *Task) Done() bool {
 	return t.Status.State == COMPLETED ||
 		t.Status.State == CANCELED ||
