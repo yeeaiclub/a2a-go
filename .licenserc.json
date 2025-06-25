@@ -1,0 +1,7 @@
+{
+  "**/*.go": "// Copyright 2025 yumosx",
+  "**/*.{yml,yaml}": "# Copyright 2025 yumosx",
+  "ignore": [
+    "mocks"
+  ]
+}
