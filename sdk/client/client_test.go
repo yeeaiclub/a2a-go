@@ -82,7 +82,7 @@ func (c *ClientSuite) TestGetTask() {
 		want types.GetTaskSuccessResponse
 	}{
 		{
-			name: "获取对应的task",
+			name: "get task",
 			req: types.GetTaskRequest{
 				Id: "1",
 			},
@@ -114,7 +114,7 @@ func (c *ClientSuite) CancelTask() {
 		req  types.CancelTaskRequest
 	}{
 		{
-			name: "取消任务对应的task",
+			name: "cancel task",
 			req:  types.CancelTaskRequest{},
 		},
 	}
