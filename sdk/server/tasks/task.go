@@ -24,7 +24,7 @@ import (
 type TaskStore interface {
 	// Save or updates a task in the store.
 	Save(ctx context.Context, task *types.Task) error
-	// Get retrieves a task from the store by ID.
+	// Get retrieves a task from the store by Id.
 	Get(ctx context.Context, taskId string) (*types.Task, error)
 	// Delete a tasks from the store by id
 	Delete(ctx context.Context, id string) error

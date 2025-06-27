@@ -1,13 +1,13 @@
 // Copyright 2025 yumosx
 //
-// Licensed under the Apache License, Version 2.0 (the \"License\");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an \"AS IS\" BASIS,
+// distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
@@ -74,66 +74,56 @@ func NewClient(client *http.Client, options ...A2AClientOption) (*A2AClient, err
 	return &a2aClient, nil
 }
 
-func (c *A2AClient) SendMessage(
-	ctx context.Context,
-	request types.SendMessageRequest,
-	options map[string]string,
-) (types.SendMessageResponse, error) {
-	if request.ID == "" {
-		request.ID = uuid.New().String()
+func (c *A2AClient) SendMessage(ctx context.Context, request types.SendMessageRequest) (*types.JSONRPCResponse, error) {
+	if request.Id == "" {
+		request.Id = uuid.New().String()
 	}
 
 	payload, err := json.Marshal(request)
 	if err != nil {
-		return types.SendMessageResponse{}, err
+		return nil, err
 	}
 
-	resp, err := c.sendRequest(ctx, payload, options)
+	resp, err := c.sendRequest(ctx, payload)
 	if err != nil {
-		return types.SendMessageResponse{}, err
+		return nil, err
 	}
 
-	var response types.SendMessageResponse
+	var response types.JSONRPCResponse
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
-		return types.SendMessageResponse{}, err
+		return nil, err
 	}
-
-	return response, nil
+	return &response, nil
 }
 
 func (c *A2AClient) SendMessageStream(ctx context.Context, request types.SendStreamingMessageRequest) error {
 	return nil
 }
 
-func (c *A2AClient) GetTask(
-	ctx context.Context,
-	request types.GetTaskRequest,
-	options map[string]string,
-) (types.GetTaskSuccessResponse, error) {
+func (c *A2AClient) GetTask(ctx context.Context, request types.GetTaskRequest) (*types.JSONRPCResponse, error) {
 	if request.Id == "" {
 		request.Id = uuid.New().String()
 	}
 	payload, err := json.Marshal(request)
 	if err != nil {
-		return types.GetTaskSuccessResponse{}, err
+		return nil, err
 	}
-	resp, err := c.sendRequest(ctx, payload, options)
+	resp, err := c.sendRequest(ctx, payload)
 	if err != nil {
-		return types.GetTaskSuccessResponse{}, err
+		return nil, err
 	}
-	var response types.GetTaskSuccessResponse
+	var response types.JSONRPCResponse
 	err = json.NewDecoder(resp.Body).Decode(&response)
 	if err != nil {
-		return types.GetTaskSuccessResponse{}, err
+		return nil, err
 	}
-	return response, nil
+	return &response, nil
 }
 
 func (c *A2AClient) CancelTask(
 	ctx context.Context,
 	request types.CancelTaskRequest,
-	options map[string]string,
 ) (types.CancelTaskResponse, error) {
 	if request.Id == "" {
 		request.Id = uuid.New().String()
@@ -142,7 +132,7 @@ func (c *A2AClient) CancelTask(
 	if err != nil {
 		return types.CancelTaskResponse{}, err
 	}
-	resp, err := c.sendRequest(ctx, payload, options)
+	resp, err := c.sendRequest(ctx, payload)
 	if err != nil {
 		return types.CancelTaskResponse{}, err
 	}
@@ -154,14 +144,10 @@ func (c *A2AClient) CancelTask(
 	return response, nil
 }
 
-func (c *A2AClient) sendRequest(ctx context.Context, payload []byte, options map[string]string) (*http.Response, error) {
+func (c *A2AClient) sendRequest(ctx context.Context, payload []byte) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", c.url, bytes.NewBuffer(payload))
 	if err != nil {
 		return nil, err
-	}
-
-	for key, value := range options {
-		req.Header.Set(key, value)
 	}
 
 	resp, err := c.clint.Do(req)

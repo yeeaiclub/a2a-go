@@ -19,11 +19,14 @@ const (
 )
 
 const (
-	MessageSend   = "/message/send"
-	MessageStream = "/message/stream"
+	MethodMessageSend   = "message/send"
+	MethodMessageStream = "message/stream"
 )
 
 const (
-	MethodTaskGet = "/tasks/get"
-	MethodCancel  = "/tasks/cancel"
+	MethodTasksGet            = "tasks/get"
+	MethodTasksCancel         = "tasks/cancel"
+	MethodTasksResubscribe    = "tasks/resubscribe"
+	MethodPushNotificationGet = "tasks/pushNotificationConfig/get"
+	MethodPushNotificationSet = "tasks/pushNotificationConfig/set"
 )

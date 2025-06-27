@@ -33,9 +33,9 @@ type AgentProvider struct {
 }
 
 type AgentSkill struct {
+	Id          string   `json:"id,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Examples    []string `json:"examples,omitempty"`
-	Id          string   `json:"id,omitempty"`
 	InputModes  []string `json:"input_modes,omitempty"`
 	Name        string   `json:"name,omitempty"`
 	OutputModes []string `json:"output_modes,omitempty"`
@@ -63,9 +63,9 @@ type AuthorizationCodeOAuthFlow struct {
 }
 
 type SendMessageRequest struct {
-	ID     string            `json:"id,omitempty"`
-	Method string            `json:"method,omitempty"`
-	Params *MessageSendParam `json:"params,omitempty"`
+	Id     string           `json:"id,omitempty"`
+	Method string           `json:"method"`
+	Params MessageSendParam `json:"params"`
 }
 
 type MessageSendParam struct {
@@ -82,9 +82,9 @@ type MessageSendConfiguration struct {
 }
 
 type PushNotificationConfig struct {
-	Id             string                             `json:"id,omitempty"`
-	URL            string                             `json:"url,omitempty"`
-	Authentication PushNotificationAuthenticationInfo `json:"authentication,omitempty"`
+	Id             string                              `json:"id,omitempty"`
+	URL            string                              `json:"url,omitempty"`
+	Authentication *PushNotificationAuthenticationInfo `json:"authentication,omitempty"`
 }
 
 type PushNotificationAuthenticationInfo struct {
@@ -93,12 +93,14 @@ type PushNotificationAuthenticationInfo struct {
 }
 
 type SendMessageResponse struct {
-	Id     string `json:"id,omitempty"`
-	Result Event  `json:"result,omitempty"`
+	Id      string        `json:"id,omitempty"`
+	JSONRPC string        `json:"jsonrpc"`
+	Result  Event         `json:"result,omitempty"`
+	Error   *JSONRPCError `json:"error,omitempty"`
 }
 
 type SendStreamingMessageRequest struct {
-	Id      string           `json:"id"`
+	Id      string           `json:"id,omitempty"`
 	JSONRPC string           `json:"jsonrpc"`
 	Method  string           `json:"method"`
 	Params  MessageSendParam `json:"params"`
@@ -106,15 +108,16 @@ type SendStreamingMessageRequest struct {
 
 type GetTaskRequest struct {
 	Id      string          `json:"id,omitempty"`
-	JSONRPC string          `json:"jsonrpc,omitempty"`
-	Method  string          `json:"method,omitempty"`
-	Params  TaskQueryParams `json:"params,omitempty"`
+	JSONRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  TaskQueryParams `json:"params"`
 }
 
-type GetTaskSuccessResponse struct {
+type GetTaskResponse struct {
 	Id      string `json:"id,omitempty"`
 	JSONRPC string `json:"jsonrpc,omitempty"`
 	Result  Task   `json:"result,omitempty"`
+	Error   any    `json:"error,omitempty"`
 }
 
 type TaskQueryParams struct {
@@ -125,7 +128,8 @@ type TaskQueryParams struct {
 
 type CancelTaskRequest struct {
 	Id     string       `json:"id,omitempty"`
-	Params TaskIdParams `json:"params,omitempty"`
+	Method string       `json:"method"`
+	Params TaskIdParams `json:"params"`
 }
 
 type TaskIdParams struct {
@@ -133,28 +137,34 @@ type TaskIdParams struct {
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
+type CancelTaskResponse struct {
+	Id      string `json:"id,omitempty"`
+	JSONRPC string `json:"jsonrpc,omitempty"`
+	Result  Task   `json:"result,omitempty"`
+}
+
 type SetTaskPushNotificationConfigRequest struct {
 	Id      string                     `json:"id,omitempty"`
-	JSONRPC string                     `json:"jsonrpc,omitempty"`
-	Method  string                     `json:"method,omitempty"`
-	Params  TaskPushNotificationConfig `json:"params,omitempty"`
+	JSONRPC string                     `json:"jsonrpc"`
+	Method  string                     `json:"method"`
+	Params  TaskPushNotificationConfig `json:"params"`
 }
 type TaskPushNotificationConfig struct {
 	TaskId string                  `json:"task_id,omitempty"`
-	Config *PushNotificationConfig `json:"config"`
+	Config *PushNotificationConfig `json:"config,omitempty"`
 }
 
 type SetTaskPushNotificationConfigSuccessResponse struct {
 	Id      string                     `json:"id,omitempty"`
-	JSONRPC string                     `json:"jsonrpc,omitempty"`
-	Result  TaskPushNotificationConfig `json:"result,omitempty"`
+	JSONRPC string                     `json:"jsonrpc"`
+	Result  TaskPushNotificationConfig `json:"result"`
 }
 
 type GetTaskPushNotificationConfigRequest struct {
 	Id      string       `json:"id,omitempty"`
-	JSONRPC string       `json:"jsonrpc,omitempty"`
-	Method  string       `json:"method,omitempty"`
-	Params  TaskIdParams `json:"params,omitempty"`
+	JSONRPC string       `json:"jsonrpc"`
+	Method  string       `json:"method"`
+	Params  TaskIdParams `json:"params"`
 }
 
 type GetTaskPushNotificationConfigSuccessResponse struct {
@@ -165,7 +175,7 @@ type GetTaskPushNotificationConfigSuccessResponse struct {
 
 type TaskResubscriptionRequest struct {
 	Id      string       `json:"id,omitempty"`
-	JSONRPC string       `json:"jsonrpc,omitempty"`
+	JSONRPC string       `json:"jsonrpc"`
 	Method  string       `json:"method"`
-	Params  TaskIdParams `json:"params,omitempty"`
+	Params  TaskIdParams `json:"params"`
 }

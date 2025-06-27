@@ -14,12 +14,25 @@
 
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+)
+
 type Event interface {
 	GetContextId() string
 	GetTaskId() string
 	EventType() string
 	Done() bool
 }
+
+type Role string
+
+const (
+	Agent Role = "agent"
+	User  Role = "user"
+)
 
 // Message Represents a single message exchanged between user and agent
 type Message struct {
@@ -170,6 +183,26 @@ func (s *StreamEvent) GetTaskId() string {
 
 func (s *StreamEvent) EventType() string {
 	return s.Event.EventType()
+}
+
+func (s *StreamEvent) MarshalTo(w io.Writer, id string) error {
+	if s.Err != nil {
+		data, _ := json.Marshal(InternalError())
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+			return err
+		}
+		return nil
+	}
+	successResp := JSONRPCSuccessResponse(id, s.Event)
+	data, err := json.Marshal(successResp)
+	if err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+		return err
+	}
+	return nil
 }
 
 type TaskState string
