@@ -82,7 +82,8 @@ func TestConsumeAndEmit(t *testing.T) {
 			},
 			want: []types.StreamEvent{
 				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false}},
-				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true}}},
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true}},
+			},
 		},
 	}
 
@@ -143,7 +144,7 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "3", Final: true})
 			},
 			want:        &types.Task{Id: "1"},
-			expectError: errs.AuthRequired,
+			expectError: errs.ErrAuthRequired,
 		},
 	}
 

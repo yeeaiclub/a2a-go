@@ -65,7 +65,7 @@ func (q *Queue) DequeueNoWait(ctx context.Context) types.StreamEvent {
 		}
 		return types.StreamEvent{Event: event}
 	default:
-		return types.StreamEvent{Err: errs.QueueEmpty}
+		return types.StreamEvent{Err: errs.ErrQueueEmpty}
 	}
 }
 

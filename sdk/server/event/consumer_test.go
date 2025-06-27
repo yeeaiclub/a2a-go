@@ -68,7 +68,7 @@ func TestConsumeAll(t *testing.T) {
 			tc.before(queue)
 
 			consumer := NewConsumer(queue, nil)
-			events := consumer.ConsumeAll(context.Background())
+			events := consumer.ConsumeAll(context.Background(), 2)
 
 			var received []types.StreamEvent
 			for event := range events {

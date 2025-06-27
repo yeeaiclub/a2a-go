@@ -84,7 +84,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 		return nil, err
 	}
 	if task == nil || task.Id == "" {
-		return nil, errs.TaskNotFound
+		return nil, errs.ErrTaskNotFound
 	}
 	if d.IsTerminalTaskSates(task.Status.State) {
 		return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
@@ -146,7 +146,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 		return ch
 	}
 	if task == nil {
-		ch <- types.StreamEvent{Err: errs.TaskNotFound}
+		ch <- types.StreamEvent{Err: errs.ErrTaskNotFound}
 		return ch
 	}
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
@@ -205,12 +205,12 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 	if result.EventType() == "task" {
 		return result.(*types.Task), nil
 	}
-	return nil, errs.InValidResponse
+	return nil, errs.ErrInValidResponse
 }
 
 func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
-		return nil, errs.UnSupportedOperation
+		return nil, errs.ErrUnSupportedOperation
 	}
 	params.TaskId = uuid.New().String()
 
@@ -223,7 +223,7 @@ func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, pa
 
 func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
-		return nil, errs.UnSupportedOperation
+		return nil, errs.ErrUnSupportedOperation
 	}
 
 	task, err := d.store.Get(ctx, params.Id)
@@ -231,11 +231,11 @@ func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, pa
 		return nil, err
 	}
 	if task == nil {
-		return nil, errs.TaskNotFound
+		return nil, errs.ErrTaskNotFound
 	}
 
 	if task.Id == "" {
-		return nil, errs.TaskNotFound
+		return nil, errs.ErrTaskNotFound
 	}
 
 	config, err := d.pushNotifier.GetInfo(ctx, params.Id)
@@ -254,7 +254,7 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.T
 	}
 
 	if task == nil {
-		errCh <- types.StreamEvent{Err: errs.TaskNotFound}
+		errCh <- types.StreamEvent{Err: errs.ErrTaskNotFound}
 		return errCh
 	}
 

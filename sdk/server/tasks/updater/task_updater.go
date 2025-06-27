@@ -162,6 +162,7 @@ func WithName(name string) TaskUpdaterOption {
 		t.name = name
 	})
 }
+
 func WithTimestamp(timeStamp string) TaskUpdaterOption {
 	return TaskUpdaterOptionFunc(func(t *TaskUpdaterOptions) {
 		t.timeStamp = timeStamp

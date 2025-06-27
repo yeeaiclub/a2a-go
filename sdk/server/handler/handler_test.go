@@ -27,8 +27,7 @@ import (
 	"github.com/yumosx/a2a-go/sdk/types"
 )
 
-type Executor struct {
-}
+type Executor struct{}
 
 func NewExecutor() *Executor {
 	return &Executor{}
@@ -46,8 +45,7 @@ func (e *Executor) Cancel(ctx context.Context, requestContext *execution.Request
 	return nil
 }
 
-type QueueManger struct {
-}
+type QueueManger struct{}
 
 func (q QueueManger) Add(ctx context.Context, taskId string, queue *event.Queue) error {
 	panic("implement me")
@@ -165,7 +163,7 @@ func TestOnMessageSendStream(t *testing.T) {
 				received = append(received, ev.Event)
 			}
 
-			for i, _ := range received {
+			for i := range received {
 				if ev, ok := received[i].(*types.TaskStatusUpdateEvent); ok {
 					ev.Status.TimeStamp = ""
 				}

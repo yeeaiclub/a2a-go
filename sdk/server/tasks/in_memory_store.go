@@ -51,9 +51,6 @@ func (s *InMemoryTaskStore) Get(ctx context.Context, taskID string) (*types.Task
 func (s *InMemoryTaskStore) Delete(ctx context.Context, taskID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	if _, exists := s.tasks[taskID]; exists {
-		delete(s.tasks, taskID)
-	}
+	delete(s.tasks, taskID)
 	return nil
 }

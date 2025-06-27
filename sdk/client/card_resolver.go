@@ -45,6 +45,7 @@ func WithAgentCardPath(agentCardPath string) A2ACardResolverOption {
 		return resolver
 	})
 }
+
 func WithOptions(options map[string]string) A2ACardResolverOption {
 	return A2ACardResolverOptionFunc(func(resolver A2ACardResolver) A2ACardResolver {
 		resolver.options = options

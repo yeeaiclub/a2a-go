@@ -14,7 +14,10 @@
 
 package handler
 
-import "github.com/labstack/echo/v4"
+import (
+	"github.com/labstack/echo/v4"
+	log "github.com/yumosx/a2a-go/internal/logger"
+)
 
 type Server struct {
 	requestHandler *RequestHandler
@@ -29,5 +32,5 @@ func NewServer(requestHandler *RequestHandler) *Server {
 func (s *Server) Start(port string) {
 	e := echo.New()
 	s.requestHandler.Route(e)
-	e.Start(":" + port)
+	log.Fatal(e.Start(":" + port))
 }

@@ -43,7 +43,7 @@ func NewResultAggregator(taskManger *manager.TaskManager, options ...ResultAggre
 func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.Consumer) <-chan types.StreamEvent {
 	events := make(chan types.StreamEvent, r.batchSize)
 	go func() {
-		allEvents := consumer.ConsumeAll(ctx)
+		allEvents := consumer.ConsumeAll(ctx, r.batchSize)
 		defer close(events)
 		for {
 			select {
@@ -76,7 +76,7 @@ func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.C
 
 // ConsumeAll process the entire event stream from consumer and return the final result.
 func (r *ResultAggregator) ConsumeAll(ctx context.Context, consumer *event.Consumer) (types.Event, error) {
-	events := consumer.ConsumeAll(ctx)
+	events := consumer.ConsumeAll(ctx, r.batchSize)
 	for {
 		select {
 		case <-ctx.Done():
@@ -110,7 +110,7 @@ func (r *ResultAggregator) ConsumeAll(ctx context.Context, consumer *event.Consu
 
 // ConsumeAndBreakOnInterrupt process the event stream until completion or an interruptible state is encountered
 func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, consumer *event.Consumer) (types.Event, error) {
-	events := consumer.ConsumeAll(ctx)
+	events := consumer.ConsumeAll(ctx, r.batchSize)
 	var result types.Event
 
 	for {
@@ -128,7 +128,7 @@ func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, consu
 			}
 			if r.IsAuthRequired(e.Event) {
 				r.continueConsume(ctx, events)
-				return nil, errs.AuthRequired
+				return nil, errs.ErrAuthRequired
 			}
 			if e.Done() {
 				task, err := r.manager.GetTask(ctx)

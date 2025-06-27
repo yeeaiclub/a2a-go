@@ -36,8 +36,8 @@ func (c *Consumer) ConsumeOne(ctx context.Context) types.StreamEvent {
 }
 
 // ConsumeAll consume all the agents streaming events form agent
-func (c *Consumer) ConsumeAll(ctx context.Context) <-chan types.StreamEvent {
-	eventCh := make(chan types.StreamEvent, 10)
+func (c *Consumer) ConsumeAll(ctx context.Context, size int) <-chan types.StreamEvent {
+	eventCh := make(chan types.StreamEvent, size)
 	go func() {
 		defer close(eventCh)
 		for {
