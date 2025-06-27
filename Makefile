@@ -10,9 +10,12 @@ fmt:
 	@gofumpt -l -w $(GOFILES)
 	@goimports -l -w $(GOFILES)
 
-.PHONY: fmt-fix
-fmt-fix:
-
 .PHONY:	lint
 lint:
 	@golangci-lint run -c .golangci.yaml
+
+
+.PHONY: check
+check:
+	@make fmt
+	@make lint

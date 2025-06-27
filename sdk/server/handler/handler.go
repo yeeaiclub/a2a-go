@@ -16,7 +16,6 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -79,13 +78,12 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 		manager.WithContextId(params.Message.ContextID),
 		manager.WithInitMessage(params.Message),
 	)
-	task, err := taskManger.GetTask(ctx)
+
+	task, err := d.getTask(ctx, params.Message.TaskID)
 	if err != nil {
 		return nil, err
 	}
-	if task == nil || task.Id == "" {
-		return nil, errs.ErrTaskNotFound
-	}
+
 	if d.IsTerminalTaskSates(task.Status.State) {
 		return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
 	}
@@ -125,7 +123,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	}
 
 	if ev.EventType() == "task" && ev.GetTaskId() != task.Id {
-		return nil, errors.New("task Id mismatch in agent response")
+		return nil, errs.ErrTaskIdMissingMatch
 	}
 	return ev, nil
 }
@@ -302,6 +300,17 @@ func (d *DefaultHandler) IsTerminalTaskSates(state types.TaskState) bool {
 		state == types.CANCELED ||
 		state == types.FAILED ||
 		state == types.REJECTED
+}
+
+func (d *DefaultHandler) getTask(ctx context.Context, taskId string) (*types.Task, error) {
+	task, err := d.store.Get(ctx, taskId)
+	if err != nil {
+		return nil, err
+	}
+	if task == nil || task.Id == "" {
+		return nil, errs.ErrTaskNotFound
+	}
+	return task, nil
 }
 
 type HandlerOption interface {

@@ -104,13 +104,23 @@ func (t *TaskManager) SaveTaskEvent(ctx context.Context, event types.Event) (*ty
 	}
 
 	if event.EventType() == "task" {
-		err := t.saveTask(ctx, event.(*types.Task))
-		if err != nil {
-			return nil, err
-		}
-		return event.(*types.Task), nil
+		return t.handleTaskEvent(ctx, event)
 	}
+	return t.handleEvent(ctx, event)
+}
 
+func (t *TaskManager) handleTaskEvent(ctx context.Context, event types.Event) (*types.Task, error) {
+	task, ok := event.(*types.Task)
+	if !ok {
+		return nil, errors.New("invalid event type for task event")
+	}
+	if err := t.saveTask(ctx, task); err != nil {
+		return nil, err
+	}
+	return task, nil
+}
+
+func (t *TaskManager) handleEvent(ctx context.Context, event types.Event) (*types.Task, error) {
 	task, err := t.EnsureTask(ctx, event)
 	if err != nil {
 		return nil, err
@@ -121,7 +131,6 @@ func (t *TaskManager) SaveTaskEvent(ctx context.Context, event types.Event) (*ty
 			task.History = append(task.History, task.Status.Message)
 		}
 	}
-
 	err = t.saveTask(ctx, task)
 	if err != nil {
 		return nil, err

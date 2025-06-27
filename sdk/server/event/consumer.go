@@ -51,20 +51,30 @@ func (c *Consumer) ConsumeAll(ctx context.Context, size int) <-chan types.Stream
 					return
 				}
 			default:
-			}
-			event := c.queue.DequeueWait(ctx)
-			if event.Err != nil {
-				eventCh <- event
-				return
-			}
-			if event.Event != nil && event.Done() {
-				eventCh <- event
-				return
-			}
-			if event.Event != nil {
-				eventCh <- event
+				event := c.queue.DequeueWait(ctx)
+				if c.sendAndCheckDone(eventCh, event) {
+					return
+				}
 			}
 		}
 	}()
 	return eventCh
+}
+
+func (c *Consumer) sendAndCheckDone(ch chan types.StreamEvent, s types.StreamEvent) bool {
+	if s.Err != nil {
+		ch <- types.StreamEvent{Err: s.Err}
+		return true
+	}
+
+	if s.Event != nil && s.Done() {
+		ch <- types.StreamEvent{Event: s.Event}
+		return true
+	}
+
+	if s.Event != nil {
+		ch <- types.StreamEvent{Event: s.Event}
+		return false
+	}
+	return false
 }
