@@ -1,13 +1,13 @@
 // Copyright 2025 yumosx
 //
-// Licensed under the Apache License, Version 2.0 (the \"License\");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an \"AS IS\" BASIS,
+// distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
@@ -33,9 +33,9 @@ type AgentProvider struct {
 }
 
 type AgentSkill struct {
+	Id          string   `json:"id,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Examples    []string `json:"examples,omitempty"`
-	Id          string   `json:"id,omitempty"`
 	InputModes  []string `json:"input_modes,omitempty"`
 	Name        string   `json:"name,omitempty"`
 	OutputModes []string `json:"output_modes,omitempty"`
@@ -63,9 +63,9 @@ type AuthorizationCodeOAuthFlow struct {
 }
 
 type SendMessageRequest struct {
-	Id     string            `json:"id,omitempty"`
-	Method string            `json:"method,omitempty"`
-	Params *MessageSendParam `json:"params,omitempty"`
+	Id     string           `json:"id,omitempty"`
+	Method string           `json:"method"`
+	Params MessageSendParam `json:"params"`
 }
 
 type MessageSendParam struct {
@@ -81,22 +81,43 @@ type MessageSendConfiguration struct {
 	PushNotificationConfig *PushNotificationConfig `json:"push_notification_config,omitempty"`
 }
 
+type PushNotificationConfig struct {
+	Id             string                              `json:"id,omitempty"`
+	URL            string                              `json:"url,omitempty"`
+	Authentication *PushNotificationAuthenticationInfo `json:"authentication,omitempty"`
+}
+
+type PushNotificationAuthenticationInfo struct {
+	Credentials string   `json:"credentials,omitempty"`
+	Schemes     []string `json:"schemes,omitempty"`
+}
+
 type SendMessageResponse struct {
-	Id     string `json:"id,omitempty"`
-	Result Event  `json:"result,omitempty"`
+	Id      string        `json:"id,omitempty"`
+	JSONRPC string        `json:"jsonrpc"`
+	Result  Event         `json:"result,omitempty"`
+	Error   *JSONRPCError `json:"error,omitempty"`
+}
+
+type SendStreamingMessageRequest struct {
+	Id      string           `json:"id,omitempty"`
+	JSONRPC string           `json:"jsonrpc"`
+	Method  string           `json:"method"`
+	Params  MessageSendParam `json:"params"`
 }
 
 type GetTaskRequest struct {
 	Id      string          `json:"id,omitempty"`
-	JSONRPC string          `json:"jsonrpc,omitempty"`
-	Method  string          `json:"method,omitempty"`
-	Params  TaskQueryParams `json:"params,omitempty"`
+	JSONRPC string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  TaskQueryParams `json:"params"`
 }
 
-type GetTaskSuccessResponse struct {
+type GetTaskResponse struct {
 	Id      string `json:"id,omitempty"`
 	JSONRPC string `json:"jsonrpc,omitempty"`
 	Result  Task   `json:"result,omitempty"`
+	Error   any    `json:"error,omitempty"`
 }
 
 type TaskQueryParams struct {
@@ -107,27 +128,43 @@ type TaskQueryParams struct {
 
 type CancelTaskRequest struct {
 	Id     string       `json:"id,omitempty"`
-	Params TaskIdParams `json:"params,omitempty"`
+	Method string       `json:"method"`
+	Params TaskIdParams `json:"params"`
+}
+
+type TaskIdParams struct {
+	Id       string         `json:"id,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+type CancelTaskResponse struct {
+	Id      string `json:"id,omitempty"`
+	JSONRPC string `json:"jsonrpc,omitempty"`
+	Result  Task   `json:"result,omitempty"`
 }
 
 type SetTaskPushNotificationConfigRequest struct {
 	Id      string                     `json:"id,omitempty"`
-	JSONRPC string                     `json:"jsonrpc,omitempty"`
-	Method  string                     `json:"method,omitempty"`
-	Params  TaskPushNotificationConfig `json:"params,omitempty"`
+	JSONRPC string                     `json:"jsonrpc"`
+	Method  string                     `json:"method"`
+	Params  TaskPushNotificationConfig `json:"params"`
+}
+type TaskPushNotificationConfig struct {
+	TaskId string                  `json:"task_id,omitempty"`
+	Config *PushNotificationConfig `json:"config,omitempty"`
 }
 
 type SetTaskPushNotificationConfigSuccessResponse struct {
 	Id      string                     `json:"id,omitempty"`
-	JSONRPC string                     `json:"jsonrpc,omitempty"`
-	Result  TaskPushNotificationConfig `json:"result,omitempty"`
+	JSONRPC string                     `json:"jsonrpc"`
+	Result  TaskPushNotificationConfig `json:"result"`
 }
 
 type GetTaskPushNotificationConfigRequest struct {
 	Id      string       `json:"id,omitempty"`
-	JSONRPC string       `json:"jsonrpc,omitempty"`
-	Method  string       `json:"method,omitempty"`
-	Params  TaskIdParams `json:"params,omitempty"`
+	JSONRPC string       `json:"jsonrpc"`
+	Method  string       `json:"method"`
+	Params  TaskIdParams `json:"params"`
 }
 
 type GetTaskPushNotificationConfigSuccessResponse struct {
@@ -138,7 +175,7 @@ type GetTaskPushNotificationConfigSuccessResponse struct {
 
 type TaskResubscriptionRequest struct {
 	Id      string       `json:"id,omitempty"`
-	JSONRPC string       `json:"jsonrpc,omitempty"`
+	JSONRPC string       `json:"jsonrpc"`
 	Method  string       `json:"method"`
-	Params  TaskIdParams `json:"params,omitempty"`
+	Params  TaskIdParams `json:"params"`
 }

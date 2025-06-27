@@ -1,13 +1,13 @@
 // Copyright 2025 yumosx
 //
-// Licensed under the Apache License, Version 2.0 (the \"License\");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an \"AS IS\" BASIS,
+// distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
@@ -36,8 +36,8 @@ func (c *Consumer) ConsumeOne(ctx context.Context) types.StreamEvent {
 }
 
 // ConsumeAll consume all the agents streaming events form agent
-func (c *Consumer) ConsumeAll(ctx context.Context) <-chan types.StreamEvent {
-	eventCh := make(chan types.StreamEvent, 10)
+func (c *Consumer) ConsumeAll(ctx context.Context, size int) <-chan types.StreamEvent {
+	eventCh := make(chan types.StreamEvent, size)
 	go func() {
 		defer close(eventCh)
 		for {
@@ -51,18 +51,30 @@ func (c *Consumer) ConsumeAll(ctx context.Context) <-chan types.StreamEvent {
 					return
 				}
 			default:
+				event := c.queue.DequeueWait(ctx)
+				if c.sendAndCheckDone(eventCh, event) {
+					return
+				}
 			}
-			event := c.queue.DequeueWait(ctx)
-			if event.Err != nil {
-				eventCh <- event
-				return
-			}
-			if event.Done() {
-				eventCh <- event
-				return
-			}
-			eventCh <- event
 		}
 	}()
 	return eventCh
+}
+
+func (c *Consumer) sendAndCheckDone(ch chan types.StreamEvent, s types.StreamEvent) bool {
+	if s.Err != nil {
+		ch <- types.StreamEvent{Err: s.Err}
+		return true
+	}
+
+	if s.Event != nil && s.Done() {
+		ch <- types.StreamEvent{Event: s.Event}
+		return true
+	}
+
+	if s.Event != nil {
+		ch <- types.StreamEvent{Event: s.Event}
+		return false
+	}
+	return false
 }

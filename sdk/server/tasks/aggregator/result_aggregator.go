@@ -1,13 +1,13 @@
 // Copyright 2025 yumosx
 //
-// Licensed under the Apache License, Version 2.0 (the \"License\");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an \"AS IS\" BASIS,
+// distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
@@ -18,6 +18,7 @@ import (
 	"context"
 
 	"github.com/yumosx/a2a-go/internal/errs"
+	log "github.com/yumosx/a2a-go/internal/logger"
 	"github.com/yumosx/a2a-go/sdk/server/event"
 	"github.com/yumosx/a2a-go/sdk/server/tasks/manager"
 	"github.com/yumosx/a2a-go/sdk/types"
@@ -27,7 +28,7 @@ import (
 type ResultAggregator struct {
 	manager   *manager.TaskManager
 	message   *types.Message
-	batchSize int64
+	batchSize int
 }
 
 func NewResultAggregator(taskManger *manager.TaskManager, options ...ResultAggregatorOption) *ResultAggregator {
@@ -40,9 +41,9 @@ func NewResultAggregator(taskManger *manager.TaskManager, options ...ResultAggre
 
 // ConsumeAndEmit process the event stream from the consumer, updates the task store
 func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.Consumer) <-chan types.StreamEvent {
-	events := make(chan types.StreamEvent, 10)
-	allEvents := consumer.ConsumeAll(ctx)
+	events := make(chan types.StreamEvent, r.batchSize)
 	go func() {
+		allEvents := consumer.ConsumeAll(ctx, r.batchSize)
 		defer close(events)
 		for {
 			select {
@@ -75,7 +76,7 @@ func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.C
 
 // ConsumeAll process the entire event stream from consumer and return the final result.
 func (r *ResultAggregator) ConsumeAll(ctx context.Context, consumer *event.Consumer) (types.Event, error) {
-	events := consumer.ConsumeAll(ctx)
+	events := consumer.ConsumeAll(ctx, r.batchSize)
 	for {
 		select {
 		case <-ctx.Done():
@@ -109,7 +110,7 @@ func (r *ResultAggregator) ConsumeAll(ctx context.Context, consumer *event.Consu
 
 // ConsumeAndBreakOnInterrupt process the event stream until completion or an interruptible state is encountered
 func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, consumer *event.Consumer) (types.Event, error) {
-	events := consumer.ConsumeAll(ctx)
+	events := consumer.ConsumeAll(ctx, r.batchSize)
 	var result types.Event
 
 	for {
@@ -127,7 +128,7 @@ func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, consu
 			}
 			if r.IsAuthRequired(e.Event) {
 				r.continueConsume(ctx, events)
-				return nil, errs.AuthRequired
+				return nil, errs.ErrAuthRequired
 			}
 			if e.Done() {
 				task, err := r.manager.GetTask(ctx)
@@ -146,6 +147,7 @@ func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
 	if event.EventType() == "status_update" {
 		updateEvent := event.(*types.TaskStatusUpdateEvent)
 		if updateEvent.Status.State == types.AUTH_REQUIRED {
+			log.Debug("Encountered an auth-required task: breaking synchronous message/send flow.")
 			return true
 		}
 	}
@@ -153,6 +155,7 @@ func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
 	if event.EventType() == "task" {
 		taskEvent := event.(*types.Task)
 		if taskEvent.Status.State == types.AUTH_REQUIRED {
+			log.Debug("Encountered an auth-required task: breaking synchronous message/send flow.")
 			return true
 		}
 	}
@@ -195,5 +198,11 @@ func (fn ResultAggregatorOptionFunc) Option(rg *ResultAggregator) {
 func WithMessage(message *types.Message) ResultAggregatorOption {
 	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
 		rg.message = message
+	})
+}
+
+func WithBatchSize(batch int) ResultAggregatorOptionFunc {
+	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
+		rg.batchSize = batch
 	})
 }

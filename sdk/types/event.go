@@ -1,18 +1,24 @@
 // Copyright 2025 yumosx
 //
-// Licensed under the Apache License, Version 2.0 (the \"License\");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an \"AS IS\" BASIS,
+// distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
 package types
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+)
 
 type Event interface {
 	GetContextId() string
@@ -20,6 +26,13 @@ type Event interface {
 	EventType() string
 	Done() bool
 }
+
+type Role string
+
+const (
+	Agent Role = "agent"
+	User  Role = "user"
+)
 
 // Message Represents a single message exchanged between user and agent
 type Message struct {
@@ -64,6 +77,15 @@ type Task struct {
 	Status    TaskStatus     `json:"task_status,omitempty"`
 	Metadata  map[string]any `json:"metadata,omitempty"`
 	Artifacts []Artifact     `json:"artifacts,omitempty"`
+}
+
+type Artifact struct {
+	ArtifactId  string         `json:"artifact_id,omitempty"`
+	Description string         `json:"description,omitempty"`
+	Extensions  []string       `json:"extension,omitempty"`
+	Metadata    map[string]any `json:"metadata,omitempty"`
+	Name        string         `json:"name,omitempty"`
+	Parts       []Part         `json:"parts,omitempty"`
 }
 
 func (t *Task) Done() bool {
@@ -161,6 +183,26 @@ func (s *StreamEvent) GetTaskId() string {
 
 func (s *StreamEvent) EventType() string {
 	return s.Event.EventType()
+}
+
+func (s *StreamEvent) MarshalTo(w io.Writer, id string) error {
+	if s.Err != nil {
+		data, _ := json.Marshal(InternalError())
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+			return err
+		}
+		return nil
+	}
+	successResp := JSONRPCSuccessResponse(id, s.Event)
+	data, err := json.Marshal(successResp)
+	if err != nil {
+		return err
+	}
+
+	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
+		return err
+	}
+	return nil
 }
 
 type TaskState string

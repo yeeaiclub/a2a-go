@@ -12,19 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package execution
+package updater
 
-import (
-	"context"
+import "testing"
 
-	"github.com/yumosx/a2a-go/sdk/server/event"
-)
+func TestUpdater(t *testing.T) {
+	testcases := []struct {
+		name string
+	}{
+		{
+			name: "",
+		},
+	}
 
-// AgentExecutor Implementations of this interface contain the core logic of the agent,
-// executing tasks based on requests and publishing updates to an event queue.
-type AgentExecutor interface {
-	// Execute the agent's logic for a given request context
-	Execute(ctx context.Context, requestContext *RequestContext, queue *event.Queue) error
-	// Cancel request the agent to cancel an ongoing task
-	Cancel(ctx context.Context, requestContext *RequestContext, queue *event.Queue) error
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+		})
+	}
 }

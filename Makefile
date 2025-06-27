@@ -1,3 +1,21 @@
+GOFILES=$(shell find . -type f -name '*.go' \
+    -not -path "./vendor/*" \
+    -not -path "./third_party/*" \
+    -not -path "./.idea/*" \
+    -not -name '*.pb.go' \
+    -not -name '*mock*.go')
+
 .PHONY:	fmt
 fmt:
-	@goimports -l -w $$(find . -type f -name '*.go'  -not -path "./.idea/*" -not -name '*.pb.go' -not -name '*mock*.go')
+	@gofumpt -l -w $(GOFILES)
+	@goimports -l -w $(GOFILES)
+
+.PHONY:	lint
+lint:
+	@golangci-lint run -c .golangci.yaml
+
+
+.PHONY: check
+check:
+	@make fmt
+	@make lint

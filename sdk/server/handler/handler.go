@@ -1,13 +1,13 @@
 // Copyright 2025 yumosx
 //
-// Licensed under the Apache License, Version 2.0 (the \"License\");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an \"AS IS\" BASIS,
+// distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
@@ -16,7 +16,6 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -31,6 +30,7 @@ import (
 
 // Handler a2a request handler interface
 type Handler interface {
+	OnGetCard() types.AgentCard
 	OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error)
 	OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error)
 	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent
@@ -47,6 +47,7 @@ type DefaultHandler struct {
 	executor         execution.AgentExecutor
 	resultAggregator *aggregator.ResultAggregator
 	pushNotifier     tasks.PushNotifier
+	agentCard        types.AgentCard
 }
 
 func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, opts ...HandlerOption) *DefaultHandler {
@@ -56,6 +57,10 @@ func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, 
 	}
 
 	return handler
+}
+
+func (d *DefaultHandler) OnGetCard() types.AgentCard {
+	return d.agentCard
 }
 
 func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error) {
@@ -73,16 +78,23 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 		manager.WithContextId(params.Message.ContextID),
 		manager.WithInitMessage(params.Message),
 	)
-	task, err := taskManger.GetTask(ctx)
+
+	task, err := d.getTask(ctx, params.Message.TaskID)
 	if err != nil {
 		return nil, err
 	}
-	if task == nil || task.Id == "" {
-		return nil, errs.TaskNotFound
-	}
-	if task.Status.State == types.COMPLETED {
+
+	if d.IsTerminalTaskSates(task.Status.State) {
 		return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
 	}
+
+	if d.shouldAddPushInfo(params) {
+		err = d.pushNotifier.SetInfo(ctx, task.Id, params.Configuration.PushNotificationConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	task = taskManger.UpdateWithMessage(params.Message, task)
 
 	reqContext := execution.NewRequestContext(
@@ -111,7 +123,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	}
 
 	if ev.EventType() == "task" && ev.GetTaskId() != task.Id {
-		return nil, errors.New("task ID mismatch in agent response")
+		return nil, errs.ErrTaskIdMissingMatch
 	}
 	return ev, nil
 }
@@ -132,7 +144,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 		return ch
 	}
 	if task == nil {
-		ch <- types.StreamEvent{Err: errs.TaskNotFound}
+		ch <- types.StreamEvent{Err: errs.ErrTaskNotFound}
 		return ch
 	}
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
@@ -140,9 +152,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 		ch <- types.StreamEvent{Err: err}
 		return ch
 	}
-	defer queue.Close()
 
-	rg := aggregator.NewResultAggregator(taskManger)
 	reqCtx := execution.NewRequestContext(
 		execution.WithParams(params),
 		execution.WithTaskId(task.Id),
@@ -153,7 +163,9 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 	errCh := d.execute(ctx, reqCtx, queue)
 	consumer := event.NewConsumer(queue, errCh)
 
-	return rg.ConsumeAndEmit(ctx, consumer)
+	rg := aggregator.NewResultAggregator(taskManger)
+	events := rg.ConsumeAndEmit(ctx, consumer)
+	return events
 }
 
 // OnCancelTask attempts to cancel the task manged by agentExecutor
@@ -174,14 +186,14 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 	if err != nil {
 		return nil, err
 	}
-	defer queue.Close()
-
 	if queue == nil {
 		queue = event.NewQueue(0)
+		defer queue.Close()
 	}
+	defer queue.Close()
 
 	reqCtx := execution.NewRequestContext()
-	done := d.execute(ctx, reqCtx, queue)
+	done := d.cancel(ctx, reqCtx, queue)
 	consumer := event.NewConsumer(queue, done)
 	result, err := rg.ConsumeAll(ctx, consumer)
 	if err != nil {
@@ -191,12 +203,12 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 	if result.EventType() == "task" {
 		return result.(*types.Task), nil
 	}
-	return nil, errs.InValidResponse
+	return nil, errs.ErrInValidResponse
 }
 
 func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
-		return nil, errs.UnSupportedOperation
+		return nil, errs.ErrUnSupportedOperation
 	}
 	params.TaskId = uuid.New().String()
 
@@ -209,7 +221,7 @@ func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, pa
 
 func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
-		return nil, errs.UnSupportedOperation
+		return nil, errs.ErrUnSupportedOperation
 	}
 
 	task, err := d.store.Get(ctx, params.Id)
@@ -217,11 +229,11 @@ func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, pa
 		return nil, err
 	}
 	if task == nil {
-		return nil, errs.TaskNotFound
+		return nil, errs.ErrTaskNotFound
 	}
 
 	if task.Id == "" {
-		return nil, errs.TaskNotFound
+		return nil, errs.ErrTaskNotFound
 	}
 
 	config, err := d.pushNotifier.GetInfo(ctx, params.Id)
@@ -240,7 +252,7 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.T
 	}
 
 	if task == nil {
-		errCh <- types.StreamEvent{Err: errs.TaskNotFound}
+		errCh <- types.StreamEvent{Err: errs.ErrTaskNotFound}
 		return errCh
 	}
 
@@ -266,6 +278,39 @@ func (d *DefaultHandler) execute(ctx context.Context, reqCtx *execution.RequestC
 		ch <- d.executor.Execute(ctx, reqCtx, queue)
 	}()
 	return ch
+}
+
+func (d *DefaultHandler) cancel(ctx context.Context, reqCtx *execution.RequestContext, queue *event.Queue) chan error {
+	ch := make(chan error, 1)
+	go func() {
+		defer close(ch)
+		ch <- d.executor.Cancel(ctx, reqCtx, queue)
+	}()
+	return ch
+}
+
+func (d *DefaultHandler) shouldAddPushInfo(params types.MessageSendParam) bool {
+	return d.pushNotifier != nil &&
+		params.Configuration != nil &&
+		params.Configuration.PushNotificationConfig != nil
+}
+
+func (d *DefaultHandler) IsTerminalTaskSates(state types.TaskState) bool {
+	return state == types.COMPLETED ||
+		state == types.CANCELED ||
+		state == types.FAILED ||
+		state == types.REJECTED
+}
+
+func (d *DefaultHandler) getTask(ctx context.Context, taskId string) (*types.Task, error) {
+	task, err := d.store.Get(ctx, taskId)
+	if err != nil {
+		return nil, err
+	}
+	if task == nil || task.Id == "" {
+		return nil, errs.ErrTaskNotFound
+	}
+	return task, nil
 }
 
 type HandlerOption interface {
