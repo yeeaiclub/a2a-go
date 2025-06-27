@@ -31,6 +31,7 @@ import (
 
 // Handler a2a request handler interface
 type Handler interface {
+	OnGetCard() types.AgentCard
 	OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error)
 	OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error)
 	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent
@@ -47,6 +48,7 @@ type DefaultHandler struct {
 	executor         execution.AgentExecutor
 	resultAggregator *aggregator.ResultAggregator
 	pushNotifier     tasks.PushNotifier
+	agentCard        types.AgentCard
 }
 
 func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, opts ...HandlerOption) *DefaultHandler {
@@ -56,6 +58,10 @@ func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, 
 	}
 
 	return handler
+}
+
+func (d *DefaultHandler) OnGetCard() types.AgentCard {
+	return d.agentCard
 }
 
 func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error) {
@@ -80,7 +86,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	if task == nil || task.Id == "" {
 		return nil, errs.TaskNotFound
 	}
-	if task.Status.State == types.COMPLETED {
+	if d.IsTerminalTaskSates(task.Status.State) {
 		return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
 	}
 
@@ -289,6 +295,13 @@ func (d *DefaultHandler) shouldAddPushInfo(params types.MessageSendParam) bool {
 	return d.pushNotifier != nil &&
 		params.Configuration != nil &&
 		params.Configuration.PushNotificationConfig != nil
+}
+
+func (d *DefaultHandler) IsTerminalTaskSates(state types.TaskState) bool {
+	return state == types.COMPLETED ||
+		state == types.CANCELED ||
+		state == types.FAILED ||
+		state == types.REJECTED
 }
 
 type HandlerOption interface {

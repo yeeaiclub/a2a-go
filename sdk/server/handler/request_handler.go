@@ -1,13 +1,13 @@
 // Copyright 2025 yumosx
 //
-// Licensed under the Apache License, Version 2.0 (the \"License\");
+// Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 // http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an \"AS IS\" BASIS,
+// distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
@@ -30,6 +30,7 @@ func NewRequestHandler(handler Handler) *RequestHandler {
 }
 
 func (r *RequestHandler) Route(e *echo.Echo) {
+	e.POST("/", r.OnGetCard)
 	e.POST("/message/send", r.OnMessageSend)
 	e.POST("/message/stream", r.OnMessageSendStream)
 	e.POST("/tasks/get", r.OnGetTask)
@@ -37,6 +38,10 @@ func (r *RequestHandler) Route(e *echo.Echo) {
 	e.POST("/tasks/resubscribe", r.OnResubscribeToTask)
 	e.POST("/tasks/pushNotificationConfig/get", r.OnGetTaskPushNotificationConfig)
 	e.POST("/tasks/pushNotificationConfig/set", r.OnSetTaskPushNotificationConfig)
+}
+
+func (r *RequestHandler) OnGetCard(ctx echo.Context) error {
+	return ctx.JSON(http.StatusOK, r.handler.OnGetCard())
 }
 
 func (r *RequestHandler) OnMessageSend(ctx echo.Context) error {
