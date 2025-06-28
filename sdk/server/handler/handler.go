@@ -30,7 +30,6 @@ import (
 
 // Handler a2a request handler interface
 type Handler interface {
-	OnGetCard() types.AgentCard
 	OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error)
 	OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error)
 	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent
@@ -57,10 +56,6 @@ func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, 
 	}
 
 	return handler
-}
-
-func (d *DefaultHandler) OnGetCard() types.AgentCard {
-	return d.agentCard
 }
 
 func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error) {

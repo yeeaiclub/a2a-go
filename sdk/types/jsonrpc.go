@@ -16,6 +16,26 @@ package types
 
 const Version = "2.0"
 
+type ErrorCode int
+
+const (
+	ErrorCodeParseError                   ErrorCode = -32700
+	ErrorCodeInvalidRequest               ErrorCode = -32600
+	ErrorCodeMethodNotFound               ErrorCode = -32601
+	ErrorCodeInvalidParams                ErrorCode = -32602
+	ErrorCodeInternalError                ErrorCode = -32603
+	ErrorCodeTaskNotFound                 ErrorCode = -32000
+	ErrorCodeTaskNotCancelable            ErrorCode = -32001
+	ErrorCodePushNotificationNotSupported ErrorCode = -32002
+	ErrorCodeUnsupportedOperation         ErrorCode = -32003
+)
+
+type JSONRPCRequest struct {
+	Id     string `json:"id,omitempty"`
+	Method string `json:"method,omitempty"`
+	Params any    `json:"params,omitempty"`
+}
+
 type JSONRPCError struct {
 	Code    int64  `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`

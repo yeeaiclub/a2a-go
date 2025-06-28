@@ -205,6 +205,18 @@ func (s *StreamEvent) MarshalTo(w io.Writer, id string) error {
 	return nil
 }
 
+func (s *StreamEvent) EncodeJSONRPC(encoder *json.Encoder, id string) error {
+	if s.Err != nil {
+		return encoder.Encode(InternalError())
+	}
+	successResp := JSONRPCSuccessResponse(id, s.Event)
+	err := encoder.Encode(successResp)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 type TaskState string
 
 const (
