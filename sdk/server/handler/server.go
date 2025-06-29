@@ -317,3 +317,9 @@ func WithIdleTimeout(idleTimeout time.Duration) ServerConfigOption {
 		server.idleTimeout = idleTimeout
 	})
 }
+
+func WithAgentCardPath(path string) ServerConfigOption {
+	return ServerConfigOptionFunc(func(server *Server) {
+		server.agentCardPath = path
+	})
+}

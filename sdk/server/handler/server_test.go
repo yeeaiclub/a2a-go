@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -212,6 +213,40 @@ func TestHandleGetTask(t *testing.T) {
 			task, err := types.MapTo[types.Task](resp.Result)
 			require.NoError(t, err)
 			assert.Equal(t, task, tc.want)
+		})
+	}
+}
+
+func TestGetCard(t *testing.T) {
+	testcases := []struct {
+		name string
+		card types.AgentCard
+	}{
+		{
+			name: "get card",
+			card: mockAgentCard,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := tasks.NewInMemoryTaskStore()
+			executor := newExecutor()
+			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
+
+			server := NewServer(mockAgentCard, handler, "/", WithAgentCardPath("/card"))
+
+			req := httptest.NewRequest("GET", "/card", nil)
+			w := httptest.NewRecorder()
+
+			server.handleGetAgentCard(w, req)
+
+			body := w.Body.String()
+			require.Equal(t, http.StatusOK, w.Code)
+			var card types.AgentCard
+			err := json.Unmarshal([]byte(body), &card)
+			require.NoError(t, err)
+			assert.Equal(t, card, tc.card)
 		})
 	}
 }
