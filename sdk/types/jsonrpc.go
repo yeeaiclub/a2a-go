@@ -14,6 +14,8 @@
 
 package types
 
+import "encoding/json"
+
 const Version = "2.0"
 
 type ErrorCode int
@@ -37,7 +39,7 @@ type JSONRPCRequest struct {
 }
 
 type JSONRPCError struct {
-	Code    int64  `json:"code,omitempty"`
+	Code    int    `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
 	Data    any    `json:"data,omitempty"`
 }
@@ -51,7 +53,7 @@ type JSONRPCResponse struct {
 
 func JSONParseError(err error) *JSONRPCError {
 	return &JSONRPCError{
-		Code:    -32700,
+		Code:    int(ErrorCodeParseError),
 		Message: err.Error(),
 	}
 }
@@ -84,4 +86,17 @@ func JSONRPCErrorResponse(id string, jsonrpcError *JSONRPCError) JSONRPCResponse
 		JSONRPC: Version,
 		Error:   jsonrpcError,
 	}
+}
+
+func MapTo[T any](result any) (T, error) {
+	var value T
+	bytes, err := json.Marshal(result)
+	if err != nil {
+		return value, err
+	}
+	err = json.Unmarshal(bytes, &value)
+	if err != nil {
+		return value, err
+	}
+	return value, nil
 }

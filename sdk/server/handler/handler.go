@@ -46,7 +46,6 @@ type DefaultHandler struct {
 	executor         execution.AgentExecutor
 	resultAggregator *aggregator.ResultAggregator
 	pushNotifier     tasks.PushNotifier
-	agentCard        types.AgentCard
 }
 
 func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, opts ...HandlerOption) *DefaultHandler {

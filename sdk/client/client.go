@@ -16,11 +16,14 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+
+	log "github.com/yumosx/a2a-go/internal/logger"
 
 	"github.com/google/uuid"
 	"github.com/yumosx/a2a-go/sdk/types"
@@ -164,41 +167,23 @@ func (c *A2AClient) SendMessageStream(request types.SendStreamingMessageRequest,
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "text/event-stream")
+	httpReq.Header.Set("Accept", "text/event-processStream")
 
 	httpResp, err := c.clint.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer httpResp.Body.Close()
+	defer func() {
+		err = httpResp.Body.Close()
+		if err != nil {
+			log.Errorf("Failed to send HTTP request to %s: %v", c.url, err)
+		}
+	}()
 
 	if httpResp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", httpResp.StatusCode)
 	}
-
-	decoder := json.NewDecoder(httpResp.Body)
-	for {
-		var event types.JSONRPCResponse
-		if err := decoder.Decode(&event); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return fmt.Errorf("failed to decode event: %w", err)
-		}
-		if event.Error != nil {
-			return fmt.Errorf("A2A error: %s (code: %d)", event.Error.Message, event.Error.Code)
-		}
-		jsonrpc, err := json.Marshal(event.Result)
-		if err != nil {
-			return fmt.Errorf("failed to encode event result: %w", err)
-		}
-		select {
-		case eventChan <- json.RawMessage(jsonrpc):
-		case <-httpReq.Context().Done():
-			return httpReq.Context().Err()
-		}
-	}
-	return nil
+	return c.processStream(httpReq.Context(), httpResp.Body, eventChan)
 }
 
 func (c *A2AClient) OnResubscribeToTask(request types.TaskResubscriptionRequest, eventChan chan any) error {
@@ -216,19 +201,56 @@ func (c *A2AClient) OnResubscribeToTask(request types.TaskResubscriptionRequest,
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "text/event-stream")
+	httpReq.Header.Set("Accept", "text/event-processStream")
 
 	httpResp, err := c.clint.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer httpResp.Body.Close()
+
+	defer func() {
+		err = httpResp.Body.Close()
+		if err != nil {
+			log.Errorf("Failed to send HTTP request to %s: %v", c.url, err)
+		}
+	}()
 
 	if httpResp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", httpResp.StatusCode)
 	}
+	return c.processStream(httpReq.Context(), httpResp.Body, eventChan)
+}
 
-	decoder := json.NewDecoder(httpResp.Body)
+func (c *A2AClient) sendRequest(request any, resp *types.JSONRPCResponse) error {
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	httpReq, err := http.NewRequest("POST", c.url, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+
+	httpResp, err := c.clint.Do(httpReq)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		err = httpResp.Body.Close()
+		if err != nil {
+			log.Errorf("Failed to send HTTP request to %s: %v", c.url, err)
+		}
+	}()
+
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan chan any) error {
+	decoder := json.NewDecoder(body)
 	for {
 		var event types.JSONRPCResponse
 		if err := decoder.Decode(&event); err != nil {
@@ -246,31 +268,9 @@ func (c *A2AClient) OnResubscribeToTask(request types.TaskResubscriptionRequest,
 		}
 		select {
 		case eventChan <- json.RawMessage(jsonrpc):
-		case <-httpReq.Context().Done():
-			return httpReq.Context().Err()
+		case <-ctx.Done():
+			return ctx.Err()
 		}
-	}
-	return nil
-}
-
-func (c *A2AClient) sendRequest(request any, resp *types.JSONRPCResponse) error {
-	payload, err := json.Marshal(request)
-	if err != nil {
-		return err
-	}
-	httpReq, err := http.NewRequest("POST", c.url, bytes.NewBuffer(payload))
-	if err != nil {
-		return err
-	}
-
-	httpResp, err := c.clint.Do(httpReq)
-	if err != nil {
-		return err
-	}
-	defer httpResp.Body.Close()
-
-	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
-		return err
 	}
 	return nil
 }

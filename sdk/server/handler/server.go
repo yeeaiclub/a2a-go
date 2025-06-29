@@ -69,13 +69,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleMessageSend(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
-	var params types.MessageSendParam
-	paramsBytes, err := json.Marshal(request.Params)
+	params, err := types.MapTo[types.MessageSendParam](request.Params)
 	if err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
-		return
-	}
-	if err := json.Unmarshal(paramsBytes, &params); err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
@@ -88,16 +83,12 @@ func (s *Server) HandleMessageSend(ctx context.Context, w http.ResponseWriter, r
 }
 
 func (s *Server) HandleMessageSendStream(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
-	var params types.MessageSendParam
-	paramsBytes, err := json.Marshal(request.Params)
+	params, err := types.MapTo[types.MessageSendParam](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
-	if err := json.Unmarshal(paramsBytes, &params); err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
-		return
-	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -129,19 +120,13 @@ func (s *Server) HandleMessageSendStream(ctx context.Context, w http.ResponseWri
 				return
 			}
 			flusher.Flush()
-
 		}
 	}
 }
 
 func (s *Server) HandleGetTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
-	var params types.TaskQueryParams
-	paramsBytes, err := json.Marshal(request.Params)
+	params, err := types.MapTo[types.TaskQueryParams](request.Params)
 	if err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
-		return
-	}
-	if err := json.Unmarshal(paramsBytes, &params); err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
@@ -154,13 +139,8 @@ func (s *Server) HandleGetTask(ctx context.Context, w http.ResponseWriter, reque
 }
 
 func (s *Server) HandleCancelTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
-	var params types.TaskIdParams
-	paramsBytes, err := json.Marshal(request.Params)
+	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
-		return
-	}
-	if err := json.Unmarshal(paramsBytes, &params); err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
@@ -173,13 +153,8 @@ func (s *Server) HandleCancelTask(ctx context.Context, w http.ResponseWriter, re
 }
 
 func (s *Server) HandleSetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
-	var params types.TaskPushNotificationConfig
-	paramsBytes, err := json.Marshal(request.Params)
+	params, err := types.MapTo[types.TaskPushNotificationConfig](request.Params)
 	if err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
-		return
-	}
-	if err := json.Unmarshal(paramsBytes, &params); err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
@@ -192,16 +167,12 @@ func (s *Server) HandleSetTaskPushNotificationConfig(ctx context.Context, w http
 }
 
 func (s *Server) HandleGetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
-	var params types.TaskIdParams
-	paramsBytes, err := json.Marshal(request.Params)
+	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
+		s.sendError(w, id, types.InternalError())
 		return
 	}
-	if err := json.Unmarshal(paramsBytes, &params); err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
-		return
-	}
+
 	event, err := s.handler.OnGetTaskPushNotificationConfig(ctx, params)
 	if err != nil {
 		s.sendError(w, id, types.InternalError())
@@ -211,16 +182,12 @@ func (s *Server) HandleGetTaskPushNotificationConfig(ctx context.Context, w http
 }
 
 func (s *Server) HandleResubscribeToTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
-	var params types.TaskIdParams
-	paramsBytes, err := json.Marshal(request.Params)
+	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
+		s.sendError(w, id, types.InternalError())
 		return
 	}
-	if err := json.Unmarshal(paramsBytes, &params); err != nil {
-		s.sendError(w, id, types.JSONParseError(err))
-		return
-	}
+
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -266,7 +233,7 @@ func (s *Server) sendError(w http.ResponseWriter, id string, err *types.JSONRPCE
 		Error:   err,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 func (s *Server) sendResponse(w http.ResponseWriter, id string, result any) {
@@ -276,5 +243,5 @@ func (s *Server) sendResponse(w http.ResponseWriter, id string, result any) {
 		Result:  result,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	_ = json.NewEncoder(w).Encode(response)
 }
