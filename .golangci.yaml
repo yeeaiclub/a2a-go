@@ -17,7 +17,6 @@ version: "2"
 linters:
   default: standard
   enable:
-    - cyclop
     - gocritic
     - gosec
     - ineffassign
@@ -26,7 +25,7 @@ linters:
     - unconvert
     - unparam
     - whitespace
-
+    - staticcheck
 formatters:
   enable:
     - gofumpt

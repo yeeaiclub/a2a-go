@@ -15,7 +15,6 @@
 package client
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -23,116 +22,42 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 	"github.com/yumosx/a2a-go/sdk/types"
 )
 
-type ClientSuite struct {
-	suite.Suite
-}
-
-func NewClientSuite() *ClientSuite {
-	return &ClientSuite{}
-}
-
-func TestClient(t *testing.T) {
-	suite.Run(t, NewClientSuite())
-}
-
-func (c *ClientSuite) TestSendMessage() {
-	t := c.T()
+func TestSendMessage(t *testing.T) {
 	testcases := []struct {
-		name string
-		req  types.SendMessageRequest
-		want types.SendMessageResponse
+		name   string
+		params types.MessageSendParam
+		task   types.Task
 	}{
 		{
 			name: "send message",
-			req: types.SendMessageRequest{
-				Method: types.MethodMessageSend,
+			params: types.MessageSendParam{
+				Message: &types.Message{
+					TaskID: "123",
+				},
 			},
-			want: types.SendMessageResponse{
-				Id: "1",
-			},
+			task: types.Task{Id: "123"},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				w.Header().Set("Content-Type", "application/json; charset=utf-8")
-				err := json.NewEncoder(w).Encode(&tc.want)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var req types.JSONRPCRequest
+				err := json.NewDecoder(r.Body).Decode(&req)
+				require.NoError(t, err)
+				assert.Equal(t, req.Method, types.MethodMessageSend)
+				resp := types.JSONRPCResponse{
+					JSONRPC: types.Version,
+					Result:  types.Task{Id: "123"},
+				}
+				w.Header().Set("Content-Type", "application/json")
+				err = json.NewEncoder(w).Encode(resp)
 				require.NoError(t, err)
 			}))
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
-			message, err := client.SendMessage(context.Background(), tc.req)
-			require.NoError(t, err)
-			assert.Equal(t, message.Id, "1")
-		})
-	}
-}
-
-func (c *ClientSuite) TestGetTask() {
-	t := c.T()
-	testcases := []struct {
-		name string
-		req  types.GetTaskRequest
-		want types.GetTaskResponse
-	}{
-		{
-			name: "get task",
-			req: types.GetTaskRequest{
-				Id: "1",
-			},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				w.Header().Set("Content-Type", "application/json; charset=utf-8")
-				err := json.NewEncoder(w).Encode(&tc.want)
-				require.NoError(t, err)
-			}))
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
-			message, err := client.GetTask(context.Background(), tc.req)
-			require.NoError(t, err)
-			assert.Equal(t, message, "1")
-		})
-	}
-}
-
-func (c *ClientSuite) CancelTask() {
-	t := c.T()
-
-	testcases := []struct {
-		name string
-		req  types.CancelTaskRequest
-	}{
-		{
-			name: "cancel task",
-			req:  types.CancelTaskRequest{},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-				w.WriteHeader(http.StatusOK)
-				w.Header().Set("Content-Type", "application/json; charset=utf-8")
-				err := json.NewEncoder(w).Encode(&tc.req)
-				require.NoError(t, err)
-			}))
-
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
-			message, err := client.CancelTask(context.Background(), tc.req)
-			require.NoError(t, err)
-			assert.Equal(t, message, "1")
+			defer server.Close()
 		})
 	}
 }

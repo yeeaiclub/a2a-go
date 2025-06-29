@@ -30,9 +30,10 @@ import (
 
 // Handler a2a request handler interface
 type Handler interface {
-	OnGetCard() types.AgentCard
 	OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error)
+	// OnMessageSend start the agent execution for the message and waits for the final result
 	OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error)
+	// OnMessageSendStream start the agent execution and yields events
 	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent
 	OnCancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error)
 	OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error)
@@ -47,7 +48,6 @@ type DefaultHandler struct {
 	executor         execution.AgentExecutor
 	resultAggregator *aggregator.ResultAggregator
 	pushNotifier     tasks.PushNotifier
-	agentCard        types.AgentCard
 }
 
 func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, opts ...HandlerOption) *DefaultHandler {
@@ -57,10 +57,6 @@ func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, 
 	}
 
 	return handler
-}
-
-func (d *DefaultHandler) OnGetCard() types.AgentCard {
-	return d.agentCard
 }
 
 func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error) {
@@ -79,23 +75,27 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 		manager.WithInitMessage(params.Message),
 	)
 
-	task, err := d.getTask(ctx, params.Message.TaskID)
+	task, err := d.store.Get(ctx, params.Message.TaskID)
 	if err != nil {
 		return nil, err
 	}
 
-	if d.IsTerminalTaskSates(task.Status.State) {
-		return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
-	}
-
-	if d.shouldAddPushInfo(params) {
-		err = d.pushNotifier.SetInfo(ctx, task.Id, params.Configuration.PushNotificationConfig)
-		if err != nil {
-			return nil, err
+	if task != nil {
+		if d.IsTerminalTaskSates(task.Status.State) {
+			return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
+		}
+		task = taskManger.UpdateWithMessage(params.Message, task)
+		if d.shouldAddPushInfo(params) {
+			err = d.pushNotifier.SetInfo(ctx, task.Id, params.Configuration.PushNotificationConfig)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
-	task = taskManger.UpdateWithMessage(params.Message, task)
+	if task == nil {
+		task = &types.Task{Id: uuid.New().String()}
+	}
 
 	reqContext := execution.NewRequestContext(
 		execution.WithParams(params),
@@ -110,12 +110,9 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	}
 	defer queue.Close()
 
-	consumer := event.NewConsumer(queue, nil)
-	err = d.executor.Execute(ctx, reqContext, queue)
-	if err != nil {
-		return nil, err
-	}
+	done := d.execute(ctx, reqContext, queue)
 
+	consumer := event.NewConsumer(queue, done)
 	resultAggregator := aggregator.NewResultAggregator(taskManger)
 	ev, err := resultAggregator.ConsumeAndBreakOnInterrupt(ctx, consumer)
 	if err != nil {
@@ -300,17 +297,6 @@ func (d *DefaultHandler) IsTerminalTaskSates(state types.TaskState) bool {
 		state == types.CANCELED ||
 		state == types.FAILED ||
 		state == types.REJECTED
-}
-
-func (d *DefaultHandler) getTask(ctx context.Context, taskId string) (*types.Task, error) {
-	task, err := d.store.Get(ctx, taskId)
-	if err != nil {
-		return nil, err
-	}
-	if task == nil || task.Id == "" {
-		return nil, errs.ErrTaskNotFound
-	}
-	return task, nil
 }
 
 type HandlerOption interface {

@@ -19,7 +19,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+
+	log "github.com/yumosx/a2a-go/internal/logger"
 
 	"github.com/google/uuid"
 	"github.com/yumosx/a2a-go/sdk/types"
@@ -74,86 +78,199 @@ func NewClient(client *http.Client, options ...A2AClientOption) (*A2AClient, err
 	return &a2aClient, nil
 }
 
-func (c *A2AClient) SendMessage(ctx context.Context, request types.SendMessageRequest) (*types.JSONRPCResponse, error) {
+func (c *A2AClient) SendMessage(params types.MessageSendParam) (*types.JSONRPCResponse, error) {
+	req := types.SendMessageRequest{
+		Id:     uuid.New().String(),
+		Method: types.MethodMessageSend,
+		Params: params,
+	}
+	var resp types.JSONRPCResponse
+	err := c.sendRequest(req, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *A2AClient) GetTask(params types.TaskQueryParams) (*types.JSONRPCResponse, error) {
+	req := types.GetTaskRequest{
+		Id:     uuid.New().String(),
+		Method: types.MethodTasksGet,
+		Params: params,
+	}
+
+	var resp types.JSONRPCResponse
+	err := c.sendRequest(req, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *A2AClient) CancelTask(params types.TaskIdParams) (*types.JSONRPCResponse, error) {
+	req := types.CancelTaskRequest{
+		Id:     uuid.New().String(),
+		Method: types.MethodTasksCancel,
+		Params: params,
+	}
+	var resp types.JSONRPCResponse
+	err := c.sendRequest(req, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *A2AClient) OnSetTaskPushNotificationConfig(params types.TaskPushNotificationConfig) (*types.JSONRPCResponse, error) {
+	req := types.SetTaskPushNotificationConfigRequest{
+		Id:     uuid.New().String(),
+		Method: types.MethodPushNotificationSet,
+		Params: params,
+	}
+
+	var resp types.JSONRPCResponse
+	err := c.sendRequest(req, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *A2AClient) OnGetTaskPushNotificationConfig(params types.TaskIdParams) (*types.JSONRPCResponse, error) {
+	req := types.GetTaskPushNotificationConfigRequest{
+		Id:     uuid.New().String(),
+		Method: types.MethodPushNotificationGet,
+		Params: params,
+	}
+
+	var resp types.JSONRPCResponse
+	err := c.sendRequest(req, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func (c *A2AClient) SendMessageStream(request types.SendStreamingMessageRequest, eventChan chan any) error {
 	if request.Id == "" {
 		request.Id = uuid.New().String()
 	}
 
 	payload, err := json.Marshal(request)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	resp, err := c.sendRequest(ctx, payload)
+	httpReq, err := http.NewRequest("POST", c.url, bytes.NewBuffer(payload))
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to send request: %w", err)
 	}
 
-	var response types.JSONRPCResponse
-	err = json.NewDecoder(resp.Body).Decode(&response)
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "text/event-processStream")
+
+	httpResp, err := c.clint.Do(httpReq)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("failed to send request: %w", err)
 	}
-	return &response, nil
+	defer func() {
+		err = httpResp.Body.Close()
+		if err != nil {
+			log.Errorf("Failed to send HTTP request to %s: %v", c.url, err)
+		}
+	}()
+
+	if httpResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", httpResp.StatusCode)
+	}
+	return c.processStream(httpReq.Context(), httpResp.Body, eventChan)
 }
 
-func (c *A2AClient) SendMessageStream(ctx context.Context, request types.SendStreamingMessageRequest) error {
+func (c *A2AClient) OnResubscribeToTask(request types.TaskResubscriptionRequest, eventChan chan any) error {
+	if request.Id == "" {
+		request.Id = uuid.New().String()
+	}
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+
+	httpReq, err := http.NewRequest("POST", c.url, bytes.NewBuffer(payload))
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Accept", "text/event-processStream")
+
+	httpResp, err := c.clint.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+
+	defer func() {
+		err = httpResp.Body.Close()
+		if err != nil {
+			log.Errorf("Failed to send HTTP request to %s: %v", c.url, err)
+		}
+	}()
+
+	if httpResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", httpResp.StatusCode)
+	}
+	return c.processStream(httpReq.Context(), httpResp.Body, eventChan)
+}
+
+func (c *A2AClient) sendRequest(request any, resp *types.JSONRPCResponse) error {
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	httpReq, err := http.NewRequest("POST", c.url, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+
+	httpResp, err := c.clint.Do(httpReq)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		err = httpResp.Body.Close()
+		if err != nil {
+			log.Errorf("Failed to send HTTP request to %s: %v", c.url, err)
+		}
+	}()
+
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (c *A2AClient) GetTask(ctx context.Context, request types.GetTaskRequest) (*types.JSONRPCResponse, error) {
-	if request.Id == "" {
-		request.Id = uuid.New().String()
+func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan chan any) error {
+	decoder := json.NewDecoder(body)
+	for {
+		var event types.JSONRPCResponse
+		if err := decoder.Decode(&event); err != nil {
+			if err == io.EOF {
+				break
+			}
+			return fmt.Errorf("failed to decode event: %w", err)
+		}
+		if event.Error != nil {
+			return fmt.Errorf("A2A error: %s (code: %d)", event.Error.Message, event.Error.Code)
+		}
+		jsonrpc, err := json.Marshal(event.Result)
+		if err != nil {
+			return fmt.Errorf("failed to encode event result: %w", err)
+		}
+		select {
+		case eventChan <- json.RawMessage(jsonrpc):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
-	payload, err := json.Marshal(request)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := c.sendRequest(ctx, payload)
-	if err != nil {
-		return nil, err
-	}
-	var response types.JSONRPCResponse
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		return nil, err
-	}
-	return &response, nil
-}
-
-func (c *A2AClient) CancelTask(
-	ctx context.Context,
-	request types.CancelTaskRequest,
-) (types.CancelTaskResponse, error) {
-	if request.Id == "" {
-		request.Id = uuid.New().String()
-	}
-	payload, err := json.Marshal(request)
-	if err != nil {
-		return types.CancelTaskResponse{}, err
-	}
-	resp, err := c.sendRequest(ctx, payload)
-	if err != nil {
-		return types.CancelTaskResponse{}, err
-	}
-	var response types.CancelTaskResponse
-	err = json.NewDecoder(resp.Body).Decode(&response)
-	if err != nil {
-		return types.CancelTaskResponse{}, err
-	}
-	return response, nil
-}
-
-func (c *A2AClient) sendRequest(ctx context.Context, payload []byte) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, "POST", c.url, bytes.NewBuffer(payload))
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.clint.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
+	return nil
 }

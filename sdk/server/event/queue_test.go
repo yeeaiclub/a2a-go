@@ -41,7 +41,6 @@ func TestEnqueue(t *testing.T) {
 			queue := NewQueue(tc.size)
 			defer queue.Close()
 			queue.Enqueue(tc.input)
-			// todo: refactor
 			event := <-queue.queue
 			assert.Equal(t, event, tc.input)
 		})

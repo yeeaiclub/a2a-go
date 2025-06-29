@@ -15,14 +15,17 @@
 package execution
 
 import (
+	"github.com/google/uuid"
+	"github.com/yumosx/a2a-go/sdk/server"
 	"github.com/yumosx/a2a-go/sdk/types"
 )
 
 type RequestContext struct {
-	TaskId    string
-	ContextId string
-	Params    types.MessageSendParam
-	Task      *types.Task
+	TaskId      string
+	ContextId   string
+	Params      types.MessageSendParam
+	Task        *types.Task
+	CallContext server.ServerCallContext
 }
 
 func NewRequestContext(options ...RequestContextOption) *RequestContext {
@@ -31,7 +34,9 @@ func NewRequestContext(options ...RequestContextOption) *RequestContext {
 	for _, opt := range options {
 		opt.Option(reqContext)
 	}
-
+	if reqContext.TaskId == "" {
+		reqContext.TaskId = uuid.New().String()
+	}
 	return reqContext
 }
 
@@ -66,5 +71,11 @@ func WithParams(params types.MessageSendParam) RequestContextOption {
 func WithTask(task *types.Task) RequestContextOption {
 	return RequestContextOptionFunc(func(ctx *RequestContext) {
 		ctx.Task = task
+	})
+}
+
+func WithServerContext(callContext server.ServerCallContext) RequestContextOption {
+	return RequestContextOptionFunc(func(ctx *RequestContext) {
+		ctx.CallContext = callContext
 	})
 }
