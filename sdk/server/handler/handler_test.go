@@ -29,7 +29,7 @@ import (
 
 type Executor struct{}
 
-func NewExecutor() *Executor {
+func newExecutor() *Executor {
 	return &Executor{}
 }
 
@@ -89,7 +89,7 @@ func TestGatTask(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(store)
-			executor := NewExecutor()
+			executor := newExecutor()
 			handler := NewDefaultHandler(store, executor)
 			task, err := handler.OnGetTask(context.Background(), tc.input)
 			require.NoError(t, err)
@@ -120,7 +120,7 @@ func TestOnMessageSend(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(store)
-			executor := NewExecutor()
+			executor := newExecutor()
 			manger := QueueManger{}
 			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
 			ev, err := handler.OnMessageSend(context.Background(), tc.input)
@@ -153,7 +153,7 @@ func TestOnMessageSendStream(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(store)
-			executor := NewExecutor()
+			executor := newExecutor()
 			manager := QueueManger{}
 			handler := NewDefaultHandler(store, executor, WithQueueManger(manager))
 			events := handler.OnMessageSendStream(context.Background(), tc.input)
@@ -196,7 +196,7 @@ func TestOnCancelTask(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(store)
-			executor := NewExecutor()
+			executor := newExecutor()
 			manger := QueueManger{}
 			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
 			task, err := handler.OnCancelTask(context.Background(), tc.input)

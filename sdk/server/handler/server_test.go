@@ -47,6 +47,58 @@ var mockAgentCard = types.AgentCard{
 	},
 }
 
+func TestHandleMessageSend(t *testing.T) {
+	testcases := []struct {
+		name   string
+		before func(store tasks.TaskStore)
+		params types.MessageSendParam
+		want   types.Task
+	}{
+		{
+			name: "test message send",
+			params: types.MessageSendParam{
+				Message: &types.Message{
+					TaskID: "1",
+					Role:   types.User,
+				},
+			},
+			before: func(store tasks.TaskStore) {
+				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
+				require.NoError(t, err)
+			},
+			want: types.Task{Id: "1", ContextId: "2", History: []*types.Message{{TaskID: "1", ContextID: "2"}}},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := tasks.NewInMemoryTaskStore()
+			tc.before(store)
+			executor := newExecutor()
+			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
+			server := NewServer(mockAgentCard, handler, "/")
+			request := types.JSONRPCRequest{
+				Id:     "1",
+				Method: types.MethodMessageSend,
+				Params: tc.params,
+			}
+			req, err := json.Marshal(request)
+			require.NoError(t, err)
+			newReq := httptest.NewRequest("POST", "/", bytes.NewBuffer(req))
+			w := httptest.NewRecorder()
+			server.ServeHTTP(w, newReq)
+
+			var resp types.JSONRPCResponse
+			err = json.NewDecoder(w.Body).Decode(&resp)
+			require.NoError(t, err)
+			assert.Equal(t, resp.JSONRPC, types.Version)
+			task, err := types.MapTo[types.Task](resp.Result)
+			require.NoError(t, err)
+			assert.Equal(t, task.Id, tc.want.Id)
+		})
+	}
+}
+
 func TestHandleMessageSendStream(t *testing.T) {
 	testcases := []struct {
 		name   string
@@ -78,9 +130,8 @@ func TestHandleMessageSendStream(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(store)
-			executor := NewExecutor()
-			manger := QueueManger{}
-			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
+			executor := newExecutor()
+			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
 			server := NewServer(mockAgentCard, handler, "/")
 			request := types.JSONRPCRequest{
 				Id:     "1",
@@ -105,10 +156,62 @@ func TestHandleMessageSendStream(t *testing.T) {
 
 			value, err := types.MapTo[types.TaskStatusUpdateEvent](resp.Result)
 			require.NoError(t, err)
-			if value.Status.TimeStamp != "" {
-				value.Status.TimeStamp = ""
-			}
+			assert.NotEmpty(t, value.Status.TimeStamp)
+			value.Status.TimeStamp = ""
 			assert.Equal(t, value, tc.want.Result)
+		})
+	}
+}
+
+func TestHandleGetTask(t *testing.T) {
+	testcases := []struct {
+		name   string
+		params types.TaskQueryParams
+		before func(store tasks.TaskStore)
+		want   types.Task
+	}{
+		{
+			name: "test get task",
+			before: func(store tasks.TaskStore) {
+				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
+				require.NoError(t, err)
+			},
+			params: types.TaskQueryParams{
+				Id: "1",
+			},
+			want: types.Task{
+				Id:        "1",
+				ContextId: "2",
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := tasks.NewInMemoryTaskStore()
+			tc.before(store)
+			executor := newExecutor()
+			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
+			server := NewServer(mockAgentCard, handler, "/")
+
+			request := types.JSONRPCRequest{
+				Id:     "1",
+				Method: types.MethodTasksGet,
+				Params: tc.params,
+			}
+			body, err := json.Marshal(request)
+			require.NoError(t, err)
+			newReq := httptest.NewRequest("POST", "/", bytes.NewBuffer(body))
+			recorder := httptest.NewRecorder()
+			server.ServeHTTP(recorder, newReq)
+
+			var resp types.JSONRPCResponse
+			err = json.NewDecoder(recorder.Body).Decode(&resp)
+			require.NoError(t, err)
+			assert.Equal(t, resp.JSONRPC, types.Version)
+			task, err := types.MapTo[types.Task](resp.Result)
+			require.NoError(t, err)
+			assert.Equal(t, task, tc.want)
 		})
 	}
 }

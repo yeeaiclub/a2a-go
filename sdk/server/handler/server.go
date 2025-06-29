@@ -19,24 +19,67 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/yumosx/a2a-go/sdk/types"
 )
 
+const (
+	defaultReadTimeout  = 10 * time.Second
+	defaultWriteTimeout = 10 * time.Second
+	defaultIdleTimeout  = 30 * time.Second
+)
+
 type Server struct {
-	card     types.AgentCard
-	handler  Handler
-	basePath string
+	agentCardPath string
+	card          types.AgentCard
+	handler       Handler
+	basePath      string
+	readTimeout   time.Duration
+	writeTimeout  time.Duration
+	idleTimeout   time.Duration
 }
 
-func NewServer(card types.AgentCard, handler Handler, basePath string) *Server {
-	return &Server{card: card, handler: handler, basePath: basePath}
+func NewServer(card types.AgentCard, handler Handler, basePath string, options ...ServerConfigOption) *Server {
+	server := &Server{
+		card:         card,
+		handler:      handler,
+		basePath:     basePath,
+		readTimeout:  defaultReadTimeout,
+		writeTimeout: defaultWriteTimeout,
+		idleTimeout:  defaultIdleTimeout,
+	}
+	for _, opt := range options {
+		opt.Option(server)
+	}
+	return server
 }
 
 func (s *Server) Start(port int) error {
 	mux := http.NewServeMux()
+	mux.HandleFunc(s.agentCardPath, s.handleGetAgentCard)
 	mux.Handle(s.basePath, s)
-	return http.ListenAndServe(fmt.Sprintf(":%d", port), mux)
+	server := &http.Server{
+		Addr:         fmt.Sprintf(":%d", port),
+		Handler:      mux,
+		ReadTimeout:  s.readTimeout,
+		WriteTimeout: s.writeTimeout,
+		IdleTimeout:  s.idleTimeout,
+	}
+	return server.ListenAndServe()
+}
+
+func (s *Server) handleGetAgentCard(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if err := json.NewEncoder(w).Encode(s.card); err != nil {
+		s.sendError(w, "", types.JSONParseError(err))
+		return
+	}
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -52,23 +95,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	switch request.Method {
 	case types.MethodMessageSend:
-		s.HandleMessageSend(r.Context(), w, &request, request.Id)
+		s.handleMessageSend(r.Context(), w, &request, request.Id)
 	case types.MethodMessageStream:
-		s.HandleMessageSendStream(r.Context(), w, &request, request.Id)
+		s.handleMessageSendStream(r.Context(), w, &request, request.Id)
 	case types.MethodTasksGet:
-		s.HandleGetTask(r.Context(), w, &request, request.Id)
+		s.handleGetTask(r.Context(), w, &request, request.Id)
 	case types.MethodTasksCancel:
-		s.HandleCancelTask(r.Context(), w, &request, request.Id)
+		s.handleCancelTask(r.Context(), w, &request, request.Id)
 	case types.MethodPushNotificationSet:
-		s.HandleSetTaskPushNotificationConfig(r.Context(), w, &request, request.Id)
+		s.handleSetTaskPushNotificationConfig(r.Context(), w, &request, request.Id)
 	case types.MethodPushNotificationGet:
-		s.HandleGetTaskPushNotificationConfig(r.Context(), w, &request, request.Id)
+		s.handleGetTaskPushNotificationConfig(r.Context(), w, &request, request.Id)
 	case types.MethodTasksResubscribe:
-		s.HandleResubscribeToTask(r.Context(), w, &request, request.Id)
+		s.handleResubscribeToTask(r.Context(), w, &request, request.Id)
+	default:
 	}
 }
 
-func (s *Server) HandleMessageSend(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleMessageSend(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	params, err := types.MapTo[types.MessageSendParam](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -82,7 +126,7 @@ func (s *Server) HandleMessageSend(ctx context.Context, w http.ResponseWriter, r
 	s.sendResponse(w, id, event)
 }
 
-func (s *Server) HandleMessageSendStream(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleMessageSendStream(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	params, err := types.MapTo[types.MessageSendParam](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -124,7 +168,7 @@ func (s *Server) HandleMessageSendStream(ctx context.Context, w http.ResponseWri
 	}
 }
 
-func (s *Server) HandleGetTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleGetTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	params, err := types.MapTo[types.TaskQueryParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -138,7 +182,7 @@ func (s *Server) HandleGetTask(ctx context.Context, w http.ResponseWriter, reque
 	s.sendResponse(w, id, event)
 }
 
-func (s *Server) HandleCancelTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleCancelTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -152,7 +196,7 @@ func (s *Server) HandleCancelTask(ctx context.Context, w http.ResponseWriter, re
 	s.sendResponse(w, id, event)
 }
 
-func (s *Server) HandleSetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleSetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	params, err := types.MapTo[types.TaskPushNotificationConfig](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -166,7 +210,7 @@ func (s *Server) HandleSetTaskPushNotificationConfig(ctx context.Context, w http
 	s.sendResponse(w, id, event)
 }
 
-func (s *Server) HandleGetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleGetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.InternalError())
@@ -181,7 +225,7 @@ func (s *Server) HandleGetTaskPushNotificationConfig(ctx context.Context, w http
 	s.sendResponse(w, id, event)
 }
 
-func (s *Server) HandleResubscribeToTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleResubscribeToTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.InternalError())
@@ -244,4 +288,32 @@ func (s *Server) sendResponse(w http.ResponseWriter, id string, result any) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(response)
+}
+
+type ServerConfigOption interface {
+	Option(server *Server)
+}
+
+type ServerConfigOptionFunc func(server *Server)
+
+func (fn ServerConfigOptionFunc) Option(server *Server) {
+	fn(server)
+}
+
+func WithReadTimeout(readTimeout time.Duration) ServerConfigOption {
+	return ServerConfigOptionFunc(func(server *Server) {
+		server.readTimeout = readTimeout
+	})
+}
+
+func WithWriteTimeout(writeTimeout time.Duration) ServerConfigOption {
+	return ServerConfigOptionFunc(func(server *Server) {
+		server.writeTimeout = writeTimeout
+	})
+}
+
+func WithIdleTimeout(idleTimeout time.Duration) ServerConfigOption {
+	return ServerConfigOptionFunc(func(server *Server) {
+		server.idleTimeout = idleTimeout
+	})
 }
