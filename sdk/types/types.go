@@ -92,13 +92,6 @@ type PushNotificationAuthenticationInfo struct {
 	Schemes     []string `json:"schemes,omitempty"`
 }
 
-type SendMessageResponse struct {
-	Id      string        `json:"id,omitempty"`
-	JSONRPC string        `json:"jsonrpc"`
-	Result  Event         `json:"result,omitempty"`
-	Error   *JSONRPCError `json:"error,omitempty"`
-}
-
 type SendStreamingMessageRequest struct {
 	Id      string           `json:"id,omitempty"`
 	JSONRPC string           `json:"jsonrpc"`
@@ -111,13 +104,6 @@ type GetTaskRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
 	Method  string          `json:"method"`
 	Params  TaskQueryParams `json:"params"`
-}
-
-type GetTaskResponse struct {
-	Id      string `json:"id,omitempty"`
-	JSONRPC string `json:"jsonrpc,omitempty"`
-	Result  Task   `json:"result,omitempty"`
-	Error   any    `json:"error,omitempty"`
 }
 
 type TaskQueryParams struct {
@@ -137,12 +123,6 @@ type TaskIdParams struct {
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
-type CancelTaskResponse struct {
-	Id      string `json:"id,omitempty"`
-	JSONRPC string `json:"jsonrpc,omitempty"`
-	Result  Task   `json:"result,omitempty"`
-}
-
 type SetTaskPushNotificationConfigRequest struct {
 	Id      string                     `json:"id,omitempty"`
 	JSONRPC string                     `json:"jsonrpc"`
@@ -154,23 +134,11 @@ type TaskPushNotificationConfig struct {
 	Config *PushNotificationConfig `json:"config,omitempty"`
 }
 
-type SetTaskPushNotificationConfigSuccessResponse struct {
-	Id      string                     `json:"id,omitempty"`
-	JSONRPC string                     `json:"jsonrpc"`
-	Result  TaskPushNotificationConfig `json:"result"`
-}
-
 type GetTaskPushNotificationConfigRequest struct {
 	Id      string       `json:"id,omitempty"`
 	JSONRPC string       `json:"jsonrpc"`
 	Method  string       `json:"method"`
 	Params  TaskIdParams `json:"params"`
-}
-
-type GetTaskPushNotificationConfigSuccessResponse struct {
-	Id      string                     `json:"id,omitempty"`
-	JSONRPC string                     `json:"jsonrpc"`
-	Result  TaskPushNotificationConfig `json:"result"`
 }
 
 type TaskResubscriptionRequest struct {

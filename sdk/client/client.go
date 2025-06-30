@@ -121,7 +121,7 @@ func (c *A2AClient) CancelTask(params types.TaskIdParams) (*types.JSONRPCRespons
 	return &resp, nil
 }
 
-func (c *A2AClient) OnSetTaskPushNotificationConfig(params types.TaskPushNotificationConfig) (*types.JSONRPCResponse, error) {
+func (c *A2AClient) SetTaskPushNotificationConfig(params types.TaskPushNotificationConfig) (*types.JSONRPCResponse, error) {
 	req := types.SetTaskPushNotificationConfigRequest{
 		Id:     uuid.New().String(),
 		Method: types.MethodPushNotificationSet,
@@ -136,7 +136,7 @@ func (c *A2AClient) OnSetTaskPushNotificationConfig(params types.TaskPushNotific
 	return &resp, nil
 }
 
-func (c *A2AClient) OnGetTaskPushNotificationConfig(params types.TaskIdParams) (*types.JSONRPCResponse, error) {
+func (c *A2AClient) GetTaskPushNotificationConfig(params types.TaskIdParams) (*types.JSONRPCResponse, error) {
 	req := types.GetTaskPushNotificationConfigRequest{
 		Id:     uuid.New().String(),
 		Method: types.MethodPushNotificationGet,
@@ -151,9 +151,12 @@ func (c *A2AClient) OnGetTaskPushNotificationConfig(params types.TaskIdParams) (
 	return &resp, nil
 }
 
-func (c *A2AClient) SendMessageStream(request types.SendStreamingMessageRequest, eventChan chan any) error {
-	if request.Id == "" {
-		request.Id = uuid.New().String()
+func (c *A2AClient) SendMessageStream(param types.MessageSendParam, eventChan chan any) error {
+	request := types.SendStreamingMessageRequest{
+		Id:      uuid.New().String(),
+		JSONRPC: types.Version,
+		Method:  types.MethodMessageStream,
+		Params:  param,
 	}
 
 	payload, err := json.Marshal(request)
@@ -167,7 +170,7 @@ func (c *A2AClient) SendMessageStream(request types.SendStreamingMessageRequest,
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "text/event-processStream")
+	httpReq.Header.Set("Accept", "text/event-stream")
 
 	httpResp, err := c.clint.Do(httpReq)
 	if err != nil {
@@ -186,10 +189,14 @@ func (c *A2AClient) SendMessageStream(request types.SendStreamingMessageRequest,
 	return c.processStream(httpReq.Context(), httpResp.Body, eventChan)
 }
 
-func (c *A2AClient) OnResubscribeToTask(request types.TaskResubscriptionRequest, eventChan chan any) error {
-	if request.Id == "" {
-		request.Id = uuid.New().String()
+func (c *A2AClient) ResubscribeToTask(params types.TaskIdParams, eventChan chan any) error {
+	request := types.TaskResubscriptionRequest{
+		Id:      uuid.New().String(),
+		JSONRPC: types.Version,
+		Method:  types.MethodTasksResubscribe,
+		Params:  params,
 	}
+
 	payload, err := json.Marshal(request)
 	if err != nil {
 		return err
@@ -201,7 +208,7 @@ func (c *A2AClient) OnResubscribeToTask(request types.TaskResubscriptionRequest,
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Accept", "text/event-processStream")
+	httpReq.Header.Set("Accept", "text/event-stream")
 
 	httpResp, err := c.clint.Do(httpReq)
 	if err != nil {
@@ -262,12 +269,12 @@ func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan
 		if event.Error != nil {
 			return fmt.Errorf("A2A error: %s (code: %d)", event.Error.Message, event.Error.Code)
 		}
-		jsonrpc, err := json.Marshal(event.Result)
+		result, err := json.Marshal(event.Result)
 		if err != nil {
 			return fmt.Errorf("failed to encode event result: %w", err)
 		}
 		select {
-		case eventChan <- json.RawMessage(jsonrpc):
+		case eventChan <- json.RawMessage(result):
 		case <-ctx.Done():
 			return ctx.Err()
 		}
