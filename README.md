@@ -5,8 +5,10 @@ Agent-to-Agent Protocol Implementation for Go
 ## how to use?
 
 ### server
+
 #### 1. define Agent Card:
 
+The AgentCard is the fundamental descriptor that defines an agent's identity, capabilities, and available skills. 
 ```go
 var mockAgentCard = types.AgentCard{
 	Name:        "test agent",
@@ -49,6 +51,7 @@ func (e *Executor) Cancel(ctx context.Context, requestContext *execution.Request
 }
 ```
 #### 3. create a task store
+
 #### 4. start a server
 
 ### client
