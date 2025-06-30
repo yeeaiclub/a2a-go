@@ -113,7 +113,10 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	done := d.execute(ctx, reqContext, queue)
 
 	consumer := event.NewConsumer(queue, done)
-	resultAggregator := aggregator.NewResultAggregator(taskManger)
+	resultAggregator := aggregator.NewResultAggregator(
+		taskManger,
+		aggregator.WithBatchSize(10),
+	)
 	ev, err := resultAggregator.ConsumeAndBreakOnInterrupt(ctx, consumer)
 	if err != nil {
 		return nil, err
@@ -160,7 +163,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 	errCh := d.execute(ctx, reqCtx, queue)
 	consumer := event.NewConsumer(queue, errCh)
 
-	rg := aggregator.NewResultAggregator(taskManger)
+	rg := aggregator.NewResultAggregator(taskManger, aggregator.WithBatchSize(10))
 	events := rg.ConsumeAndEmit(ctx, consumer)
 	return events
 }
@@ -178,7 +181,7 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 		manager.WithContextId(task.ContextId),
 	)
 
-	rg := aggregator.NewResultAggregator(taskManger)
+	rg := aggregator.NewResultAggregator(taskManger, aggregator.WithBatchSize(10))
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
 	if err != nil {
 		return nil, err
@@ -258,7 +261,7 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.T
 		manager.WithTaskId(task.Id),
 		manager.WithContextId(task.ContextId),
 	)
-	rg := aggregator.NewResultAggregator(manger)
+	rg := aggregator.NewResultAggregator(manger, aggregator.WithBatchSize(10))
 	queue, err := d.queueManger.Tap(ctx, task.Id)
 	if err != nil {
 		errCh <- types.StreamEvent{Err: err}
