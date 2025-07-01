@@ -16,7 +16,7 @@ lint:
 
 .PHONY: test
 test:
-	@go test -v -coverprofile=coverage.out ./...
+	@go test -v -race -timeout=30s -coverprofile=coverage.out ./...
 	@go tool cover -func=coverage.out
 	@rm -f coverage.out
 
