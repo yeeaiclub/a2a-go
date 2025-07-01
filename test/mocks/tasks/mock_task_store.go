@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	types "github.com/yumosx/a2a-go/sdk/types"
+	types "github.com/yeeaiclub/a2a-go/sdk/types"
 	gomock "go.uber.org/mock/gomock"
 )
 

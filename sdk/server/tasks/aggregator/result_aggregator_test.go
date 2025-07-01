@@ -20,11 +20,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yumosx/a2a-go/internal/errs"
-	"github.com/yumosx/a2a-go/sdk/server/event"
-	"github.com/yumosx/a2a-go/sdk/server/tasks"
-	"github.com/yumosx/a2a-go/sdk/server/tasks/manager"
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/internal/errs"
+	"github.com/yeeaiclub/a2a-go/sdk/server/event"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks/manager"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 func TestConsumeAll(t *testing.T) {

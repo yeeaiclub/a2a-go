@@ -16,8 +16,8 @@ package execution
 
 import (
 	"github.com/google/uuid"
-	"github.com/yumosx/a2a-go/sdk/server"
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/server"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 type RequestContext struct {

@@ -17,11 +17,11 @@ package aggregator
 import (
 	"context"
 
-	"github.com/yumosx/a2a-go/internal/errs"
-	log "github.com/yumosx/a2a-go/internal/logger"
-	"github.com/yumosx/a2a-go/sdk/server/event"
-	"github.com/yumosx/a2a-go/sdk/server/tasks/manager"
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/internal/errs"
+	log "github.com/yeeaiclub/a2a-go/internal/logger"
+	"github.com/yeeaiclub/a2a-go/sdk/server/event"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks/manager"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 // ResultAggregator is used to process the event streams from an AgentExecutor

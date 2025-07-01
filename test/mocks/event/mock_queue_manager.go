@@ -13,7 +13,7 @@ import (
 	context "context"
 	reflect "reflect"
 
-	event "github.com/yumosx/a2a-go/sdk/server/event"
+	event "github.com/yeeaiclub/a2a-go/sdk/server/event"
 	gomock "go.uber.org/mock/gomock"
 )
 

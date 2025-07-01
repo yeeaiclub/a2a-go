@@ -19,8 +19,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/yumosx/a2a-go/sdk/server/tasks"
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 // TaskManager helps mange a task's lifecycle during execution of a request

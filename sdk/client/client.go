@@ -23,10 +23,10 @@ import (
 	"io"
 	"net/http"
 
-	log "github.com/yumosx/a2a-go/internal/logger"
+	log "github.com/yeeaiclub/a2a-go/internal/logger"
 
 	"github.com/google/uuid"
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 type A2AClient struct {

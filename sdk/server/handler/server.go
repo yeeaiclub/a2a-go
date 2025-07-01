@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 const (

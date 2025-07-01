@@ -19,8 +19,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/yumosx/a2a-go/internal/errs"
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/internal/errs"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 type Queue struct {

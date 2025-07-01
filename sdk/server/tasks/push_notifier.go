@@ -17,7 +17,7 @@ package tasks
 import (
 	"context"
 
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 // PushNotifier interface to store, retrieve push notification for tasks

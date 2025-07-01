@@ -17,7 +17,7 @@ package execution
 import (
 	"context"
 
-	"github.com/yumosx/a2a-go/sdk/server/event"
+	"github.com/yeeaiclub/a2a-go/sdk/server/event"
 )
 
 // AgentExecutor Implementations of this interface contain the core logic of the agent,

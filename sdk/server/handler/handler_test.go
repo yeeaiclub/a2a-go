@@ -20,11 +20,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yumosx/a2a-go/sdk/server/event"
-	"github.com/yumosx/a2a-go/sdk/server/execution"
-	"github.com/yumosx/a2a-go/sdk/server/tasks"
-	"github.com/yumosx/a2a-go/sdk/server/tasks/updater"
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/server/event"
+	"github.com/yeeaiclub/a2a-go/sdk/server/execution"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks/updater"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 type Executor struct{}

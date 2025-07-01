@@ -17,7 +17,7 @@ package event
 import (
 	"context"
 
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 // Consumer to read events form the agent event queue

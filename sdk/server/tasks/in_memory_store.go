@@ -18,7 +18,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 type InMemoryTaskStore struct {

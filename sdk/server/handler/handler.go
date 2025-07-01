@@ -19,13 +19,13 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/yumosx/a2a-go/internal/errs"
-	"github.com/yumosx/a2a-go/sdk/server/event"
-	"github.com/yumosx/a2a-go/sdk/server/execution"
-	"github.com/yumosx/a2a-go/sdk/server/tasks"
-	"github.com/yumosx/a2a-go/sdk/server/tasks/aggregator"
-	"github.com/yumosx/a2a-go/sdk/server/tasks/manager"
-	"github.com/yumosx/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/internal/errs"
+	"github.com/yeeaiclub/a2a-go/sdk/server/event"
+	"github.com/yeeaiclub/a2a-go/sdk/server/execution"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks/aggregator"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks/manager"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 // Handler a2a request handler interface
