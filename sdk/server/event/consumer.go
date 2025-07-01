@@ -40,17 +40,27 @@ func (c *Consumer) ConsumeAll(ctx context.Context, size int) <-chan types.Stream
 	eventCh := make(chan types.StreamEvent, size)
 	go func() {
 		defer close(eventCh)
+		errChanClosed := false
 		for {
 			select {
 			case <-ctx.Done():
 				eventCh <- types.StreamEvent{Err: ctx.Err()}
 				return
-			case err, ok := <-c.err:
-				if err != nil && !ok {
-					eventCh <- types.StreamEvent{Err: err}
-					return
-				}
 			default:
+				if !errChanClosed {
+					select {
+					case err, ok := <-c.err:
+						if !ok {
+							errChanClosed = true
+							continue
+						}
+						if err != nil {
+							eventCh <- types.StreamEvent{Err: err}
+							return
+						}
+					default:
+					}
+				}
 				event := c.queue.DequeueWait(ctx)
 				if c.sendAndCheckDone(eventCh, event) {
 					return
