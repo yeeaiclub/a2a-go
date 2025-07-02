@@ -58,8 +58,7 @@ func TestSendMessage(t *testing.T) {
 				assert.NoError(t, err)
 			}))
 			defer server.Close()
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
+			client := NewClient(http.DefaultClient, server.URL)
 			message, err := client.SendMessage(tc.params)
 			require.NoError(t, err)
 			task, err := types.MapTo[types.Task](message.Result)
@@ -99,8 +98,7 @@ func TestGetTask(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
+			client := NewClient(http.DefaultClient, server.URL)
 			resp, err := client.GetTask(tc.params)
 			require.NoError(t, err)
 			task, err := types.MapTo[types.Task](resp.Result)
@@ -140,8 +138,7 @@ func TestCancelTask(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
+			client := NewClient(http.DefaultClient, server.URL)
 			resp, err := client.CancelTask(tc.params)
 			require.NoError(t, err)
 
@@ -198,8 +195,7 @@ func TestMessageStream(t *testing.T) {
 
 			defer server.Close()
 
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
+			client := NewClient(http.DefaultClient, server.URL)
 			eventChan := make(chan any)
 			errChan := make(chan error, 1)
 
@@ -213,11 +209,11 @@ func TestMessageStream(t *testing.T) {
 				rawMsg, ok := event.(json.RawMessage)
 				require.True(t, ok)
 				var task types.Task
-				err = json.Unmarshal(rawMsg, &task)
+				err := json.Unmarshal(rawMsg, &task)
 				require.NoError(t, err)
 				events = append(events, task)
 			}
-			err = <-errChan
+			err := <-errChan
 			require.NoError(t, err)
 			<-done
 			assert.Equal(t, string(events[0].Status.State), string(types.COMPLETED))

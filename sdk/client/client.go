@@ -19,7 +19,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -36,46 +35,30 @@ type A2AClient struct {
 }
 
 type A2AClientOption interface {
-	Option(client A2AClient) A2AClient
+	Option(client *A2AClient)
 }
 
-type A2AClientOptionFunc func(client A2AClient) A2AClient
+type A2AClientOptionFunc func(client *A2AClient)
 
-func (fn A2AClientOptionFunc) Option(client A2AClient) A2AClient {
-	return fn(client)
-}
-
-func WithUrl(url string) A2AClientOption {
-	return A2AClientOptionFunc(func(client A2AClient) A2AClient {
-		client.url = url
-		return client
-	})
+func (fn A2AClientOptionFunc) Option(client *A2AClient) {
+	fn(client)
 }
 
 func WithAgentCard(card *types.AgentCard) A2AClientOption {
-	return A2AClientOptionFunc(func(client A2AClient) A2AClient {
+	return A2AClientOptionFunc(func(client *A2AClient) {
 		client.card = card
-		return client
 	})
 }
 
-func NewClient(client *http.Client, options ...A2AClientOption) (*A2AClient, error) {
-	a2aClient := A2AClient{
+func NewClient(client *http.Client, url string, options ...A2AClientOption) *A2AClient {
+	a2aClient := &A2AClient{
 		clint: client,
+		url:   url,
 	}
-
 	for _, opt := range options {
-		a2aClient = opt.Option(a2aClient)
+		opt.Option(a2aClient)
 	}
-
-	if a2aClient.url == "" && a2aClient.card == nil {
-		return nil, errors.New("must provide either agent_card or url")
-	}
-
-	if a2aClient.card != nil {
-		a2aClient.url = a2aClient.card.URL
-	}
-	return &a2aClient, nil
+	return a2aClient
 }
 
 func (c *A2AClient) SendMessage(params types.MessageSendParam) (*types.JSONRPCResponse, error) {
