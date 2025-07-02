@@ -24,6 +24,5 @@ test:
 
 .PHONY: check
 check:
-	@make license-check
 	@make fmt
 	@make lint

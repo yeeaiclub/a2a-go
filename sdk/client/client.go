@@ -248,7 +248,7 @@ func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan
 		}
 		var event types.JSONRPCResponse
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			return fmt.Errorf("failed to decode event: %v", err)
+			return fmt.Errorf("failed to decode event: %w", err)
 		}
 		if event.Error != nil {
 			return fmt.Errorf("a2a error: %s (code: %d)", event.Error.Message, event.Error.Code)
