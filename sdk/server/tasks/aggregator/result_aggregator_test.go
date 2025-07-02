@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ func TestConsumeAll(t *testing.T) {
 			aggregator := NewResultAggregator(taskManger)
 			all, err := aggregator.ConsumeAll(context.Background(), consumer)
 			require.NoError(t, err)
-			assert.Equal(t, all, tc.want)
+			assert.Equal(t, tc.want, all)
 		})
 	}
 }

@@ -1,3 +1,4 @@
+ALLDOCS=$(shell find . -name '*.md' -type f | sort)
 GOFILES=$(shell find . -type f -name '*.go' \
     -not -path "./vendor/*" \
     -not -path "./third_party/*" \
@@ -9,6 +10,7 @@ GOFILES=$(shell find . -type f -name '*.go' \
 fmt:
 	@gofumpt -l -w $(GOFILES)
 	@goimports -l -w $(GOFILES)
+
 
 .PHONY:	lint
 lint:

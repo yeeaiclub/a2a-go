@@ -1,4 +1,4 @@
-# Copyright 2025 yumosx
+# Copyright 2025 yeeaiclub
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +13,16 @@
 # limitations under the License.
 
 version: "2"
-
+run:
+  issues-exit-code: 1
+  tests: true
 linters:
   default: standard
   enable:
     - gocritic
     - gosec
+    - govet
+    - errorlint
     - ineffassign
     - misspell
     - prealloc
@@ -26,6 +30,8 @@ linters:
     - unparam
     - whitespace
     - staticcheck
+    - testifylint
+    - usestdlibvars
 formatters:
   enable:
     - gofumpt

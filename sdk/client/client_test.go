@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,19 +47,18 @@ func TestSendMessage(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				var req types.JSONRPCRequest
 				err := json.NewDecoder(r.Body).Decode(&req)
-				require.NoError(t, err)
-				assert.Equal(t, req.Method, types.MethodMessageSend)
+				assert.NoError(t, err)
+				assert.Equal(t, types.MethodMessageSend, req.Method)
 				resp := types.JSONRPCResponse{
 					JSONRPC: types.Version,
 					Result:  types.Task{Id: "123"},
 				}
 				w.Header().Set("Content-Type", "application/json")
 				err = json.NewEncoder(w).Encode(resp)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}))
 			defer server.Close()
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
+			client := NewClient(http.DefaultClient, server.URL)
 			message, err := client.SendMessage(tc.params)
 			require.NoError(t, err)
 			task, err := types.MapTo[types.Task](message.Result)
@@ -87,25 +86,24 @@ func TestGetTask(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				var req types.JSONRPCRequest
 				err := json.NewDecoder(request.Body).Decode(&req)
-				require.NoError(t, err)
-				assert.Equal(t, req.Method, types.MethodTasksGet)
+				assert.NoError(t, err)
+				assert.Equal(t, types.MethodTasksGet, req.Method)
 				resp := types.JSONRPCResponse{
 					JSONRPC: types.Version,
 					Result:  types.Task{Id: "123"},
 				}
 				writer.Header().Set("Content-Type", "application/json")
 				err = json.NewEncoder(writer).Encode(resp)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}))
 			defer server.Close()
 
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
+			client := NewClient(http.DefaultClient, server.URL)
 			resp, err := client.GetTask(tc.params)
 			require.NoError(t, err)
 			task, err := types.MapTo[types.Task](resp.Result)
 			require.NoError(t, err)
-			assert.Equal(t, task, tc.want)
+			assert.Equal(t, tc.want, task)
 		})
 	}
 }
@@ -128,26 +126,25 @@ func TestCancelTask(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				var req types.JSONRPCRequest
 				err := json.NewDecoder(request.Body).Decode(&req)
-				require.NoError(t, err)
-				assert.Equal(t, req.Method, types.MethodTasksCancel)
+				assert.NoError(t, err)
+				assert.Equal(t, types.MethodTasksCancel, req.Method)
 				resp := types.JSONRPCResponse{
 					JSONRPC: types.Version,
 					Result:  types.Task{Id: "123"},
 				}
 				writer.Header().Set("Content-Type", "application/json")
 				err = json.NewEncoder(writer).Encode(resp)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}))
 			defer server.Close()
 
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
+			client := NewClient(http.DefaultClient, server.URL)
 			resp, err := client.CancelTask(tc.params)
 			require.NoError(t, err)
 
 			task, err := types.MapTo[types.Task](resp.Result)
 			require.NoError(t, err)
-			assert.Equal(t, task, tc.want)
+			assert.Equal(t, tc.want, task)
 		})
 	}
 }
@@ -171,8 +168,8 @@ func TestMessageStream(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				var req types.JSONRPCRequest
 				err := json.NewDecoder(request.Body).Decode(&req)
-				require.NoError(t, err)
-				assert.Equal(t, req.Method, types.MethodMessageStream)
+				assert.NoError(t, err)
+				assert.Equal(t, types.MethodMessageStream, req.Method)
 
 				writer.Header().Set("Content-Type", "application/json")
 				writer.(http.Flusher).Flush()
@@ -190,7 +187,7 @@ func TestMessageStream(t *testing.T) {
 						Result:  event,
 					}
 					err = json.NewEncoder(writer).Encode(resp)
-					require.NoError(t, err)
+					assert.NoError(t, err)
 					writer.(http.Flusher).Flush()
 				}
 				close(done)
@@ -198,8 +195,7 @@ func TestMessageStream(t *testing.T) {
 
 			defer server.Close()
 
-			client, err := NewClient(http.DefaultClient, WithUrl(server.URL))
-			require.NoError(t, err)
+			client := NewClient(http.DefaultClient, server.URL)
 			eventChan := make(chan any)
 			errChan := make(chan error, 1)
 
@@ -213,11 +209,11 @@ func TestMessageStream(t *testing.T) {
 				rawMsg, ok := event.(json.RawMessage)
 				require.True(t, ok)
 				var task types.Task
-				err = json.Unmarshal(rawMsg, &task)
+				err := json.Unmarshal(rawMsg, &task)
 				require.NoError(t, err)
 				events = append(events, task)
 			}
-			err = <-errChan
+			err := <-errChan
 			require.NoError(t, err)
 			<-done
 			assert.Equal(t, string(events[0].Status.State), string(types.COMPLETED))

@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,14 +40,15 @@ type Server struct {
 	idleTimeout   time.Duration
 }
 
-func NewServer(card types.AgentCard, handler Handler, basePath string, options ...ServerConfigOption) *Server {
+func NewServer(cardPath string, basePath string, card types.AgentCard, handler Handler, options ...ServerConfigOption) *Server {
 	server := &Server{
-		card:         card,
-		handler:      handler,
-		basePath:     basePath,
-		readTimeout:  defaultReadTimeout,
-		writeTimeout: defaultWriteTimeout,
-		idleTimeout:  defaultIdleTimeout,
+		basePath:      basePath,
+		agentCardPath: cardPath,
+		card:          card,
+		handler:       handler,
+		readTimeout:   defaultReadTimeout,
+		writeTimeout:  defaultWriteTimeout,
+		idleTimeout:   defaultIdleTimeout,
 	}
 	for _, opt := range options {
 		opt.Option(server)
@@ -315,11 +316,5 @@ func WithWriteTimeout(writeTimeout time.Duration) ServerConfigOption {
 func WithIdleTimeout(idleTimeout time.Duration) ServerConfigOption {
 	return ServerConfigOptionFunc(func(server *Server) {
 		server.idleTimeout = idleTimeout
-	})
-}
-
-func WithAgentCardPath(path string) ServerConfigOption {
-	return ServerConfigOptionFunc(func(server *Server) {
-		server.agentCardPath = path
 	})
 }

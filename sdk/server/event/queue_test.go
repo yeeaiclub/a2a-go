@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ func TestDequeueNoWait(t *testing.T) {
 			defer queue.Close()
 			tc.before(queue)
 			wait := queue.DequeueNoWait(context.Background())
-			assert.Equal(t, wait.Event, tc.want)
+			assert.Equal(t, tc.want, wait.Event)
 		})
 	}
 }
@@ -99,7 +99,7 @@ func TestDequeueWait(t *testing.T) {
 			defer queue.Close()
 			tc.before(queue)
 			wait := queue.DequeueWait(context.Background())
-			assert.Equal(t, wait.Event, tc.want)
+			assert.Equal(t, tc.want, wait.Event)
 		})
 	}
 }
