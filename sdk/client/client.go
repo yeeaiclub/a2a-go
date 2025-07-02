@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package client
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -23,9 +24,8 @@ import (
 	"io"
 	"net/http"
 
-	log "github.com/yeeaiclub/a2a-go/internal/logger"
-
 	"github.com/google/uuid"
+	log "github.com/yeeaiclub/a2a-go/internal/logger"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
@@ -164,7 +164,7 @@ func (c *A2AClient) SendMessageStream(param types.MessageSendParam, eventChan ch
 		return err
 	}
 
-	httpReq, err := http.NewRequest("POST", c.url, bytes.NewBuffer(payload))
+	httpReq, err := http.NewRequest(http.MethodPost, c.url, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
@@ -202,7 +202,7 @@ func (c *A2AClient) ResubscribeToTask(params types.TaskIdParams, eventChan chan 
 		return err
 	}
 
-	httpReq, err := http.NewRequest("POST", c.url, bytes.NewBuffer(payload))
+	httpReq, err := http.NewRequest(http.MethodPost, c.url, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
@@ -233,7 +233,7 @@ func (c *A2AClient) sendRequest(request any, resp *types.JSONRPCResponse) error 
 	if err != nil {
 		return err
 	}
-	httpReq, err := http.NewRequest("POST", c.url, bytes.NewBuffer(payload))
+	httpReq, err := http.NewRequest(http.MethodPost, c.url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
 	}
@@ -257,17 +257,18 @@ func (c *A2AClient) sendRequest(request any, resp *types.JSONRPCResponse) error 
 }
 
 func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan chan any) error {
-	decoder := json.NewDecoder(body)
-	for {
+	scanner := bufio.NewScanner(body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
 		var event types.JSONRPCResponse
-		if err := decoder.Decode(&event); err != nil {
-			if err == io.EOF {
-				break
-			}
-			return fmt.Errorf("failed to decode event: %w", err)
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			return fmt.Errorf("failed to decode event: %v", err)
 		}
 		if event.Error != nil {
-			return fmt.Errorf("A2A error: %s (code: %d)", event.Error.Message, event.Error.Code)
+			return fmt.Errorf("a2a error: %s (code: %d)", event.Error.Message, event.Error.Code)
 		}
 		result, err := json.Marshal(event.Result)
 		if err != nil {
@@ -278,6 +279,10 @@ func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan
 		case <-ctx.Done():
 			return ctx.Err()
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scanner error: %w", err)
 	}
 	return nil
 }

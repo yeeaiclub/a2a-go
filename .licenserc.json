@@ -1,6 +1,6 @@
 {
-  "**/*.go": "// Copyright 2025 yumosx",
-  "**/*.{yml,yaml}": "# Copyright 2025 yumosx",
+  "**/*.go": "// Copyright 2025 yeeaiclub",
+  "**/*.{yml,yaml}": "# Copyright 2025 yeeaiclub",
   "ignore": [
     "mocks"
   ]

@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -125,7 +125,7 @@ func TestOnMessageSend(t *testing.T) {
 			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
 			ev, err := handler.OnMessageSend(context.Background(), tc.input)
 			require.NoError(t, err)
-			assert.Equal(t, ev, tc.want)
+			assert.Equal(t, tc.want, ev)
 		})
 	}
 }
@@ -201,7 +201,7 @@ func TestOnCancelTask(t *testing.T) {
 			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
 			task, err := handler.OnCancelTask(context.Background(), tc.input)
 			require.NoError(t, err)
-			assert.Equal(t, task, tc.want)
+			assert.Equal(t, tc.want, task)
 		})
 	}
 }

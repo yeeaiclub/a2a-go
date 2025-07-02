@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ func TestHandleMessageSend(t *testing.T) {
 			tc.before(store)
 			executor := newExecutor()
 			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
-			server := NewServer(mockAgentCard, handler, "/")
+			server := NewServer("/card", "/", mockAgentCard, handler)
 			request := types.JSONRPCRequest{
 				Id:     "1",
 				Method: types.MethodMessageSend,
@@ -85,14 +85,14 @@ func TestHandleMessageSend(t *testing.T) {
 			}
 			req, err := json.Marshal(request)
 			require.NoError(t, err)
-			newReq := httptest.NewRequest("POST", "/", bytes.NewBuffer(req))
+			newReq := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(req))
 			w := httptest.NewRecorder()
 			server.ServeHTTP(w, newReq)
 
 			var resp types.JSONRPCResponse
 			err = json.NewDecoder(w.Body).Decode(&resp)
 			require.NoError(t, err)
-			assert.Equal(t, resp.JSONRPC, types.Version)
+			assert.Equal(t, types.Version, resp.JSONRPC)
 			task, err := types.MapTo[types.Task](resp.Result)
 			require.NoError(t, err)
 			assert.Equal(t, task.Id, tc.want.Id)
@@ -133,7 +133,7 @@ func TestHandleMessageSendStream(t *testing.T) {
 			tc.before(store)
 			executor := newExecutor()
 			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
-			server := NewServer(mockAgentCard, handler, "/")
+			server := NewServer("/card", "/", mockAgentCard, handler)
 			request := types.JSONRPCRequest{
 				Id:     "1",
 				Method: types.MethodMessageStream,
@@ -141,13 +141,13 @@ func TestHandleMessageSendStream(t *testing.T) {
 			}
 			req, err := json.Marshal(request)
 			require.NoError(t, err)
-			newReq := httptest.NewRequest("POST", "/", bytes.NewBuffer(req))
+			newReq := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(req))
 			newReq.Header.Set("Content-Type", "application/json")
 			newReq.Header.Set("Accept", "text/event-stream")
 			w := httptest.NewRecorder()
 			server.ServeHTTP(w, newReq)
 			response := strings.Split(strings.TrimSpace(w.Body.String()), "\n")
-			assert.True(t, len(response) == 1)
+			assert.Len(t, response, 1)
 			var resp types.JSONRPCResponse
 
 			err = json.Unmarshal([]byte(response[0]), &resp)
@@ -193,7 +193,7 @@ func TestHandleGetTask(t *testing.T) {
 			tc.before(store)
 			executor := newExecutor()
 			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
-			server := NewServer(mockAgentCard, handler, "/")
+			server := NewServer("/card", "/", mockAgentCard, handler)
 
 			request := types.JSONRPCRequest{
 				Id:     "1",
@@ -202,17 +202,17 @@ func TestHandleGetTask(t *testing.T) {
 			}
 			body, err := json.Marshal(request)
 			require.NoError(t, err)
-			newReq := httptest.NewRequest("POST", "/", bytes.NewBuffer(body))
+			newReq := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
 			recorder := httptest.NewRecorder()
 			server.ServeHTTP(recorder, newReq)
 
 			var resp types.JSONRPCResponse
 			err = json.NewDecoder(recorder.Body).Decode(&resp)
 			require.NoError(t, err)
-			assert.Equal(t, resp.JSONRPC, types.Version)
+			assert.Equal(t, types.Version, resp.JSONRPC)
 			task, err := types.MapTo[types.Task](resp.Result)
 			require.NoError(t, err)
-			assert.Equal(t, task, tc.want)
+			assert.Equal(t, tc.want, task)
 		})
 	}
 }
@@ -234,9 +234,9 @@ func TestGetCard(t *testing.T) {
 			executor := newExecutor()
 			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
 
-			server := NewServer(mockAgentCard, handler, "/", WithAgentCardPath("/card"))
+			server := NewServer("/", "/card", mockAgentCard, handler)
 
-			req := httptest.NewRequest("GET", "/card", nil)
+			req := httptest.NewRequest(http.MethodGet, "/card", nil)
 			w := httptest.NewRecorder()
 
 			server.handleGetAgentCard(w, req)

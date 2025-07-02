@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ func TestGetAgentCard(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 				w.Header().Set("Content-Type", "application/json; charset=utf-8")
 				err := json.NewEncoder(w).Encode(&tc.want)
-				require.NoError(t, err)
+				assert.NoError(t, err)
 			}))
 			resolver := NewA2ACardResolver(
 				http.DefaultClient,
@@ -59,7 +59,7 @@ func TestGetAgentCard(t *testing.T) {
 			)
 			card, err := resolver.GetAgentCard()
 			require.NoError(t, err)
-			assert.Equal(t, card, tc.want)
+			assert.Equal(t, tc.want, card)
 		})
 	}
 }

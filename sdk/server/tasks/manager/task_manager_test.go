@@ -1,4 +1,4 @@
-// Copyright 2025 yumosx
+// Copyright 2025 yeeaiclub
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ func TestGetTask(t *testing.T) {
 
 			task, err := manger.GetTask(context.Background())
 			require.NoError(t, err)
-			assert.Equal(t, task, tc.want)
+			assert.Equal(t, tc.want, task)
 		})
 	}
 }
@@ -83,8 +83,8 @@ func TestSaveTask(t *testing.T) {
 				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1", ContextId: "2"})
 			},
 			after: func(manager *TaskManager) {
-				assert.Equal(t, manager.taskId, "1")
-				assert.Equal(t, manager.contextId, "2")
+				assert.Equal(t, "1", manager.taskId)
+				assert.Equal(t, "2", manager.contextId)
 			},
 		},
 		{
@@ -94,8 +94,8 @@ func TestSaveTask(t *testing.T) {
 				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1", ContextId: "2"})
 			},
 			after: func(manager *TaskManager) {
-				assert.Equal(t, manager.taskId, "1")
-				assert.Equal(t, manager.contextId, "2")
+				assert.Equal(t, "1", manager.taskId)
+				assert.Equal(t, "2", manager.contextId)
 			},
 		},
 	}
@@ -229,7 +229,7 @@ func TestSaveStream(t *testing.T) {
 			manger := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
 			event, err := manger.SaveTaskEvent(context.Background(), tc.event)
 			require.NoError(t, err)
-			assert.Equal(t, event, tc.want)
+			assert.Equal(t, tc.want, event)
 		})
 	}
 }
