@@ -14,6 +14,11 @@
 
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 type Part interface {
 	GetKind() string
 	GetMetadata() map[string]any
@@ -51,6 +56,46 @@ func (f *FilePart) GetKind() string {
 
 func (f *FilePart) GetMetadata() map[string]any {
 	return f.Metadata
+}
+
+func (f *FilePart) UnmarshalJSON(data []byte) error {
+	aux := &struct {
+		File     json.RawMessage `json:"file"`
+		Kind     string          `json:"kind,omitempty"`
+		Metadata map[string]any  `json:"metadata,omitempty"`
+	}{}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	f.Kind = aux.Kind
+	f.Metadata = aux.Metadata
+	var probe struct {
+		Bytes *string `json:"bytes,omitempty"`
+		Url   *string `json:"url,omitempty"`
+	}
+	if err := json.Unmarshal(aux.File, &probe); err != nil {
+		return err
+	}
+
+	switch {
+	case probe.Bytes != nil:
+		var withBytes FileWithBytes
+		if err := json.Unmarshal(aux.File, &withBytes); err != nil {
+			return err
+		}
+		f.File = &withBytes
+	case probe.Url != nil:
+		var withUrl FileWithUrl
+		if err := json.Unmarshal(aux.File, &withUrl); err != nil {
+			return err
+		}
+		f.File = &withUrl
+	default:
+		return fmt.Errorf("unknown file type in FilePart")
+	}
+	return nil
 }
 
 type FileBase struct {
