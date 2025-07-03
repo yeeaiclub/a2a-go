@@ -15,14 +15,42 @@
 package types
 
 type Part interface {
-	GetPart() string
+	GetKind() string
+	GetMetadata() map[string]any
+}
+
+type FileContent interface {
+	GetMimeType() string
+	GetName() string
 }
 
 // DataPart Represents a structured data segment within a message part.
 type DataPart struct {
 	Data     map[string]any `json:"data,omitempty"`
+	Kind     string         `json:"kind"`
+	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+func (d *DataPart) GetKind() string {
+	return "data"
+}
+
+func (d *DataPart) GetMetadata() map[string]any {
+	return d.Metadata
+}
+
+type FilePart struct {
+	File     FileContent    `json:"file"`
 	Kind     string         `json:"kind,omitempty"`
 	Metadata map[string]any `json:"metadata,omitempty"`
+}
+
+func (f *FilePart) GetKind() string {
+	return "file"
+}
+
+func (f *FilePart) GetMetadata() map[string]any {
+	return f.Metadata
 }
 
 type FileBase struct {
@@ -31,15 +59,29 @@ type FileBase struct {
 }
 
 type FileWithBytes struct {
-	Bytes    string `json:"bytes,omitempty"`
-	MimeType string `json:"mime_type,omitempty"`
-	Name     string `json:"name,omitempty"`
+	FileBase
+	Bytes string `json:"bytes,omitempty"`
+}
+
+func (fb *FileWithBytes) GetMimeType() string {
+	return fb.MimeType
+}
+
+func (fb *FileWithBytes) GetName() string {
+	return fb.Name
 }
 
 type FileWithUrl struct {
-	MimeType string `json:"mime_type,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Url      string `json:"url,omitempty"`
+	FileBase
+	Url string `json:"url,omitempty"`
+}
+
+func (fu *FileWithUrl) GetMimeType() string {
+	return fu.MimeType
+}
+
+func (fu *FileWithUrl) GetName() string {
+	return fu.Name
 }
 
 type TextPart struct {
@@ -48,6 +90,10 @@ type TextPart struct {
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
-func (t *TextPart) GetPart() string {
+func (t *TextPart) GetKind() string {
 	return "text"
+}
+
+func (t *TextPart) GetMetadata() map[string]any {
+	return t.Metadata
 }

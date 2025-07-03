@@ -129,6 +129,7 @@ type SetTaskPushNotificationConfigRequest struct {
 	Method  string                     `json:"method"`
 	Params  TaskPushNotificationConfig `json:"params"`
 }
+
 type TaskPushNotificationConfig struct {
 	TaskId string                  `json:"task_id,omitempty"`
 	Config *PushNotificationConfig `json:"config,omitempty"`

@@ -35,6 +35,7 @@ type Handler interface {
 	OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error)
 	// OnMessageSendStream start the agent execution and yields events
 	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent
+	// OnCancelTask attempts to cancel the task manged by the agentExecutor
 	OnCancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error)
 	OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error)
 	OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error)
