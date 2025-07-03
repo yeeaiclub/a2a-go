@@ -14,19 +14,30 @@
 
 package updater
 
-import "testing"
+import (
+	"testing"
 
-func TestUpdater(t *testing.T) {
+	"github.com/yeeaiclub/a2a-go/sdk/server/event"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
+)
+
+func TestUpdateStatus(t *testing.T) {
 	testcases := []struct {
-		name string
+		name      string
+		taskId    string
+		contextId string
+		state     types.TaskState
 	}{
 		{
-			name: "",
+			name: "update status",
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
+			queue := event.NewQueue(0)
+			updater := NewTaskUpdater(queue, tc.taskId, tc.contextId)
+			updater.UpdateStatus(tc.state)
 		})
 	}
 }

@@ -20,8 +20,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yeeaiclub/a2a-go/internal/mocks/tasks"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
-	"github.com/yeeaiclub/a2a-go/test/mocks/tasks"
 	"go.uber.org/mock/gomock"
 )
 

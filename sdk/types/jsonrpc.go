@@ -39,9 +39,9 @@ type JSONRPCRequest struct {
 }
 
 type JSONRPCError struct {
-	Code    int    `json:"code,omitempty"`
-	Message string `json:"message,omitempty"`
-	Data    any    `json:"data,omitempty"`
+	Code    ErrorCode `json:"code,omitempty"`
+	Message string    `json:"message,omitempty"`
+	Data    any       `json:"data,omitempty"`
 }
 
 type JSONRPCResponse struct {
@@ -53,21 +53,21 @@ type JSONRPCResponse struct {
 
 func JSONParseError(err error) *JSONRPCError {
 	return &JSONRPCError{
-		Code:    int(ErrorCodeParseError),
+		Code:    ErrorCodeParseError,
 		Message: err.Error(),
 	}
 }
 
 func MethodNotFoundError() *JSONRPCError {
 	return &JSONRPCError{
-		Code:    -32601,
+		Code:    ErrorCodeMethodNotFound,
 		Message: "Method not found",
 	}
 }
 
 func InternalError() *JSONRPCError {
 	return &JSONRPCError{
-		Code:    -32603,
+		Code:    ErrorCodeInternalError,
 		Message: "Internal error",
 	}
 }

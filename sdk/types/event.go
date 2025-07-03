@@ -21,92 +21,10 @@ import (
 )
 
 type Event interface {
-	GetContextId() string
 	GetTaskId() string
+	GetContextId() string
 	EventType() string
 	Done() bool
-}
-
-type Role string
-
-const (
-	Agent Role = "agent"
-	User  Role = "user"
-)
-
-// Message Represents a single message exchanged between user and agent
-type Message struct {
-	Role             Role           `json:"role"`
-	TaskID           string         `json:"task_id,omitempty"`
-	ContextID        string         `json:"context_id,omitempty"`
-	Extensions       []string       `json:"extensions,omitempty"`
-	Kind             string         `json:"kind,omitempty"`
-	MessageID        string         `json:"message_id,omitempty"`
-	ReferenceTaskIDs []string       `json:"referenceTaskIds,omitempty"`
-	Parts            []Part         `json:"parts,omitempty"`
-	Metadata         map[string]any `json:"metadata,omitempty"`
-}
-
-func (m Message) Done() bool {
-	return true
-}
-
-func (m Message) GetContextId() string {
-	return m.ContextID
-}
-
-func (m Message) GetTaskId() string {
-	return m.TaskID
-}
-
-func (m Message) EventType() string {
-	return "message"
-}
-
-type TaskStatus struct {
-	Message   *Message  `json:"id,omitempty"`
-	State     TaskState `json:"state"`
-	TimeStamp string    `json:"time_stamp,omitempty"`
-}
-
-type Task struct {
-	Id        string         `json:"id"`
-	ContextId string         `json:"context_id"`
-	History   []*Message     `json:"history,omitempty"`
-	Kind      string         `json:"kind,omitempty"`
-	Status    TaskStatus     `json:"task_status,omitempty"`
-	Metadata  map[string]any `json:"metadata,omitempty"`
-	Artifacts []Artifact     `json:"artifacts,omitempty"`
-}
-
-type Artifact struct {
-	ArtifactId  string         `json:"artifact_id,omitempty"`
-	Description string         `json:"description,omitempty"`
-	Extensions  []string       `json:"extension,omitempty"`
-	Metadata    map[string]any `json:"metadata,omitempty"`
-	Name        string         `json:"name,omitempty"`
-	Parts       []Part         `json:"parts,omitempty"`
-}
-
-func (t *Task) Done() bool {
-	return t.Status.State == COMPLETED ||
-		t.Status.State == CANCELED ||
-		t.Status.State == FAILED ||
-		t.Status.State == REJECTED ||
-		t.Status.State == UNKNOWN ||
-		t.Status.State == InputRequired
-}
-
-func (t *Task) GetContextId() string {
-	return t.ContextId
-}
-
-func (t *Task) GetTaskId() string {
-	return t.Id
-}
-
-func (t *Task) EventType() string {
-	return "task"
 }
 
 // TaskArtifactUpdateEvent Send by server during sendStream and subscribe requests
@@ -216,17 +134,3 @@ func (s *StreamEvent) EncodeJSONRPC(encoder *json.Encoder, id string) error {
 	}
 	return nil
 }
-
-type TaskState string
-
-const (
-	SUBMITTED     = "submitted"
-	WORKING       = "working"
-	InputRequired = "required"
-	COMPLETED     = "completed"
-	CANCELED      = "canceled"
-	FAILED        = "failed"
-	REJECTED      = "rejected"
-	AUTH_REQUIRED = "auth_required"
-	UNKNOWN       = "unknown"
-)

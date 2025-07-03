@@ -14,10 +14,12 @@ fmt:
 
 .PHONY:	lint
 lint:
+	@echo "lint code..."
 	@golangci-lint run -c .golangci.yaml
 
 .PHONY: test
 test:
+	@echo "Running tests..."
 	@go test -v -race -timeout=30s -coverprofile=coverage.out ./...
 	@go tool cover -func=coverage.out
 	@rm -f coverage.out
