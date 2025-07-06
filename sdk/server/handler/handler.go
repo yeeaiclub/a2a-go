@@ -131,7 +131,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 
 func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent {
 	ch := make(chan types.StreamEvent, 1)
-
+	defer close(ch)
 	taskManger := manager.NewTaskManger(
 		d.store,
 		manager.WithTaskId(params.Message.TaskID),
@@ -145,8 +145,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 		return ch
 	}
 	if task == nil {
-		ch <- types.StreamEvent{Err: errs.ErrTaskNotFound}
-		return ch
+		task = &types.Task{Id: uuid.New().String()}
 	}
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
 	if err != nil {
@@ -209,7 +208,7 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 
 func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
-		return nil, errs.ErrUnSupportedOperation
+		return nil, errs.ErrUnsupportedOperation
 	}
 	params.TaskId = uuid.New().String()
 
@@ -222,7 +221,7 @@ func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, pa
 
 func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
-		return nil, errs.ErrUnSupportedOperation
+		return nil, errs.ErrUnsupportedOperation
 	}
 
 	task, err := d.store.Get(ctx, params.Id)
@@ -246,6 +245,7 @@ func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, pa
 
 func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent {
 	errCh := make(chan types.StreamEvent, 1)
+	defer close(errCh)
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
 		errCh <- types.StreamEvent{Err: err}
@@ -263,6 +263,7 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.T
 		manager.WithContextId(task.ContextId),
 	)
 	rg := aggregator.NewResultAggregator(manger, aggregator.WithBatchSize(10))
+	// todo: close the queue
 	queue, err := d.queueManger.Tap(ctx, task.Id)
 	if err != nil {
 		errCh <- types.StreamEvent{Err: err}

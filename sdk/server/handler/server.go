@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"time"
 
+	log "github.com/yeeaiclub/a2a-go/internal/logger"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
@@ -67,6 +68,8 @@ func (s *Server) Start(port int) error {
 		WriteTimeout: s.writeTimeout,
 		IdleTimeout:  s.idleTimeout,
 	}
+	log.Infof("Starting HTTP server on :%d with ReadTimeout=%v, WriteTimeout=%v, IdleTimeout=%v",
+		port, s.readTimeout, s.writeTimeout, s.idleTimeout)
 	return server.ListenAndServe()
 }
 
@@ -121,6 +124,7 @@ func (s *Server) handleMessageSend(ctx context.Context, w http.ResponseWriter, r
 	}
 	event, err := s.handler.OnMessageSend(ctx, params)
 	if err != nil {
+		log.Errorf("handleMessageSend | onMessageSend | %v", err)
 		s.sendError(w, id, types.InternalError())
 		return
 	}
@@ -152,8 +156,11 @@ func (s *Server) handleMessageSendStream(ctx context.Context, w http.ResponseWri
 		select {
 		case <-ctx.Done():
 			return
-		case ev, ok := <-events:
-			if !ok {
+		case ev, o := <-events:
+			if !o {
+				if ev.Err != nil || ev.Event != nil {
+					_ = ev.EncodeJSONRPC(encoder, id)
+				}
 				return
 			}
 			if ev.Err != nil {
@@ -177,6 +184,7 @@ func (s *Server) handleGetTask(ctx context.Context, w http.ResponseWriter, reque
 	}
 	event, err := s.handler.OnGetTask(ctx, params)
 	if err != nil {
+		log.Errorf("handleGetTask | onGetTask| %v", err)
 		s.sendError(w, id, types.InternalError())
 		return
 	}
@@ -191,6 +199,7 @@ func (s *Server) handleCancelTask(ctx context.Context, w http.ResponseWriter, re
 	}
 	event, err := s.handler.OnCancelTask(ctx, params)
 	if err != nil {
+		log.Errorf("handleCancelTaskk | onCancelTask | %v", err)
 		s.sendError(w, id, types.InternalError())
 		return
 	}
@@ -205,6 +214,7 @@ func (s *Server) handleSetTaskPushNotificationConfig(ctx context.Context, w http
 	}
 	event, err := s.handler.OnSetTaskPushNotificationConfig(ctx, params)
 	if err != nil {
+		log.Errorf("handleSetTaskPushNotificationConfig | OnSetTaskPushNotificationConfig | %v", err)
 		s.sendError(w, id, types.InternalError())
 		return
 	}
@@ -214,12 +224,13 @@ func (s *Server) handleSetTaskPushNotificationConfig(ctx context.Context, w http
 func (s *Server) handleGetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
-		s.sendError(w, id, types.InternalError())
+		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
 
 	event, err := s.handler.OnGetTaskPushNotificationConfig(ctx, params)
 	if err != nil {
+		log.Errorf("handleGetTaskPushNotificationConfig | OnGetTaskPushNotificationConfig | %v", err)
 		s.sendError(w, id, types.InternalError())
 		return
 	}
@@ -251,8 +262,11 @@ func (s *Server) handleResubscribeToTask(ctx context.Context, w http.ResponseWri
 		select {
 		case <-ctx.Done():
 			return
-		case ev, ok := <-events:
-			if !ok {
+		case ev, o := <-events:
+			if !o {
+				if ev.Err != nil || ev.Event != nil {
+					_ = ev.EncodeJSONRPC(encoder, id)
+				}
 				return
 			}
 			if ev.Err != nil {

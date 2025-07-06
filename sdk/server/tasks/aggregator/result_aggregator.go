@@ -32,7 +32,7 @@ type ResultAggregator struct {
 }
 
 func NewResultAggregator(taskManger *manager.TaskManager, options ...ResultAggregatorOption) *ResultAggregator {
-	rg := &ResultAggregator{manager: taskManger}
+	rg := &ResultAggregator{manager: taskManger, batchSize: 10}
 	for _, opt := range options {
 		opt.Option(rg)
 	}
@@ -62,12 +62,12 @@ func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, consumer *event.C
 					events <- e
 					return
 				}
-				ev, err := r.manager.Process(ctx, e.Event)
+				_, err := r.manager.Process(ctx, e.Event)
 				if err != nil {
 					events <- types.StreamEvent{Err: err}
 					return
 				}
-				events <- types.StreamEvent{Event: ev}
+				events <- e
 			}
 		}
 	}()
