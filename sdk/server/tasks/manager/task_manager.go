@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/yeeaiclub/a2a-go/internal/errs"
 	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
@@ -72,7 +73,7 @@ func NewTaskManger(store tasks.TaskStore, opts ...TaskManagerOption) *TaskManage
 // GetTask retrieves the current task object, either from memory or the store
 func (t *TaskManager) GetTask(ctx context.Context) (*types.Task, error) {
 	if t.taskId == "" {
-		return nil, errors.New("task_id is not set, cannot get task")
+		return nil, errs.ErrTaskIdNotSet
 	}
 
 	if t.currentTask != nil {

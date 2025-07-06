@@ -152,8 +152,11 @@ func (s *Server) handleMessageSendStream(ctx context.Context, w http.ResponseWri
 		select {
 		case <-ctx.Done():
 			return
-		case ev, ok := <-events:
-			if !ok {
+		case ev, o := <-events:
+			if !o {
+				if ev.Err != nil || ev.Event != nil {
+					_ = ev.EncodeJSONRPC(encoder, id)
+				}
 				return
 			}
 			if ev.Err != nil {
@@ -251,8 +254,11 @@ func (s *Server) handleResubscribeToTask(ctx context.Context, w http.ResponseWri
 		select {
 		case <-ctx.Done():
 			return
-		case ev, ok := <-events:
-			if !ok {
+		case ev, o := <-events:
+			if !o {
+				if ev.Err != nil || ev.Event != nil {
+					_ = ev.EncodeJSONRPC(encoder, id)
+				}
 				return
 			}
 			if ev.Err != nil {

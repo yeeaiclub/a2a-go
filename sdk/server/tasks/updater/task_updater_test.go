@@ -35,7 +35,8 @@ func TestUpdateStatus(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			queue := event.NewQueue(0)
+			queue := event.NewQueue(10)
+			defer queue.Close()
 			updater := NewTaskUpdater(queue, tc.taskId, tc.contextId)
 			updater.UpdateStatus(tc.state)
 		})

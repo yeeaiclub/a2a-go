@@ -19,9 +19,10 @@ import "errors"
 var (
 	ErrQueueEmpty           = errors.New("queue is empty")
 	ErrQueueClosed          = errors.New("queue is closed")
-	ErrUnSupportedOperation = errors.New("this operation is not supported")
+	ErrUnsupportedOperation = errors.New("this operation is not supported")
 	ErrTaskNotFound         = errors.New("task not found")
 	ErrInValidResponse      = errors.New("agent did not return valid response for cancel")
 	ErrAuthRequired         = errors.New("authentication required")
 	ErrTaskIdMissingMatch   = errors.New("task Id mismatch in agent response")
+	ErrTaskIdNotSet         = errors.New("task id not set, cannot get task")
 )
