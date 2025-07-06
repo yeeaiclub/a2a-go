@@ -15,27 +15,22 @@
 package log
 
 import (
-	"fmt"
 	"io"
 	"log"
-	"os"
 )
 
 type stdImplementation struct {
 	logger *log.Logger
-	prefix string
 }
 
 func newStdImplementation(out io.Writer) *stdImplementation {
-	pid := os.Getpid()
 	return &stdImplementation{
 		logger: log.New(out, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.LUTC),
-		prefix: fmt.Sprintf("asynq: pid=%d ", pid),
 	}
 }
 
 func (s *stdImplementation) format(prefix string, msg string) string {
-	return s.prefix + prefix + msg
+	return prefix + msg
 }
 
 func (s *stdImplementation) Debug(msg string) {
