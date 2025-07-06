@@ -263,7 +263,7 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.T
 		manager.WithContextId(task.ContextId),
 	)
 	rg := aggregator.NewResultAggregator(manger, aggregator.WithBatchSize(10))
-	//todo: close the queue
+	// todo: close the queue
 	queue, err := d.queueManger.Tap(ctx, task.Id)
 	if err != nil {
 		errCh <- types.StreamEvent{Err: err}
