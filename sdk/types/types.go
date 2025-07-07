@@ -15,16 +15,18 @@
 package types
 
 type AgentCard struct {
-	Name               string             `json:"name"`
-	Description        string             `json:"description"`
-	URL                string             `json:"url,omitempty"`
-	Skills             []AgentSkill       `json:"skills"`
-	DefaultInputModes  []string           `json:"default_input_modes,omitempty"`
-	DefaultOutputModes []string           `json:"default_output_modes,omitempty"`
-	Provider           *AgentProvider     `json:"provider,omitempty"`
-	Capabilities       *AgentCapabilities `json:"capabilities,omitempty"`
-	Version            string             `json:"version"`
-	IconUrl            string             `json:"icon_url,omitempty"`
+	Name               string                    `json:"name"`
+	Description        string                    `json:"description"`
+	URL                string                    `json:"url,omitempty"`
+	Skills             []AgentSkill              `json:"skills"`
+	DefaultInputModes  []string                  `json:"default_input_modes,omitempty"`
+	DefaultOutputModes []string                  `json:"default_output_modes,omitempty"`
+	Provider           *AgentProvider            `json:"provider,omitempty"`
+	Capabilities       *AgentCapabilities        `json:"capabilities,omitempty"`
+	Version            string                    `json:"version"`
+	IconUrl            string                    `json:"icon_url,omitempty"`
+	Security           []map[string][]string     `json:"security,omitempty"`
+	SecuritySchemes    map[string]SecurityScheme `json:"security_schemes,omitempty"`
 }
 
 type AgentProvider struct {
@@ -53,13 +55,6 @@ type AgentExtension struct {
 	Description string         `json:"description,omitempty"`
 	Params      map[string]any `json:"params,omitempty"`
 	Required    bool           `json:"required,omitempty"`
-}
-
-type AuthorizationCodeOAuthFlow struct {
-	AuthorizationUrl string            `json:"authorization_url,omitempty"`
-	RefreshUrl       string            `json:"refresh_url,omitempty"`
-	Scopes           map[string]string `json:"scopes,omitempty"`
-	TokenUrl         string            `json:"token_url,omitempty"`
 }
 
 type SendMessageRequest struct {

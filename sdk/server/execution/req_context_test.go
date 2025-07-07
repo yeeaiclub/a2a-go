@@ -34,9 +34,70 @@ func TestNewRequestContext(t *testing.T) {
 			name:      "new request context",
 			taskId:    "1",
 			contextId: "2",
-			params:    types.MessageSendParam{},
-			tasks:     &types.Task{Id: "1", ContextId: "2"},
-			want:      &RequestContext{ContextId: "2", TaskId: "1", Params: types.MessageSendParam{}, Task: &types.Task{Id: "1", ContextId: "2"}},
+			params: types.MessageSendParam{
+				Configuration: &types.MessageSendConfiguration{
+					AcceptedOutputModes:    []string{"text", "markdown"},
+					Blocking:               true,
+					HistoryLength:          10,
+					PushNotificationConfig: &types.PushNotificationConfig{},
+				},
+				Message: &types.Message{
+					Role:             types.User,
+					TaskID:           "1",
+					ContextID:        "2",
+					Extensions:       []string{"extension1", "extension2"},
+					Kind:             "text",
+					MessageID:        "msg123",
+					ReferenceTaskIDs: []string{"ref1", "ref2"},
+					Parts: []types.Part{
+						&types.TextPart{
+							Text: "hello, World",
+						},
+					},
+					Metadata: map[string]any{
+						"priority": "high",
+					},
+				},
+				Metadata: map[string]any{
+					"priority": "high",
+					"source":   "test",
+				},
+			},
+			tasks: &types.Task{Id: "1", ContextId: "2"},
+			want: &RequestContext{
+				ContextId: "2",
+				TaskId:    "1",
+				Params: types.MessageSendParam{
+					Configuration: &types.MessageSendConfiguration{
+						AcceptedOutputModes:    []string{"text", "markdown"},
+						Blocking:               true,
+						HistoryLength:          10,
+						PushNotificationConfig: &types.PushNotificationConfig{},
+					},
+					Message: &types.Message{
+						Role:             types.User,
+						TaskID:           "1",
+						ContextID:        "2",
+						Extensions:       []string{"extension1", "extension2"},
+						Kind:             "text",
+						MessageID:        "msg123",
+						ReferenceTaskIDs: []string{"ref1", "ref2"},
+						Parts: []types.Part{
+							&types.TextPart{
+								Text: "hello, World",
+							},
+						},
+						Metadata: map[string]any{
+							"priority": "high",
+						},
+					},
+					Metadata: map[string]any{
+						"priority": "high",
+						"source":   "test",
+					},
+				},
+				Task: &types.Task{Id: "1", ContextId: "2"},
+			},
 		},
 	}
 
