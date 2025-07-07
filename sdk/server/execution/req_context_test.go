@@ -96,7 +96,8 @@ func TestNewRequestContext(t *testing.T) {
 						"source":   "test",
 					},
 				},
-				Task: &types.Task{Id: "1", ContextId: "2"}},
+				Task: &types.Task{Id: "1", ContextId: "2"},
+			},
 		},
 	}
 
