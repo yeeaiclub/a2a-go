@@ -14,6 +14,10 @@
 
 package types
 
+type SecurityScheme interface {
+	GetType() string
+}
+
 // APIKeySecurityScheme API key security scheme
 type APIKeySecurityScheme struct {
 	Description string `json:"description,omitempty"`
@@ -22,11 +26,59 @@ type APIKeySecurityScheme struct {
 	Type        string `json:"type,omitempty"`
 }
 
+func (a APIKeySecurityScheme) GetType() string {
+	return "api_key"
+}
+
 // HTTPAuthSecurityScheme HTTP Authentication security scheme.
 type HTTPAuthSecurityScheme struct {
 	Scheme      string `json:"scheme"`
 	Description string `json:"description,omitempty"`
 	BaseFormat  string `json:"base_format,omitempty"`
+	Type        string `json:"type,omitempty"`
+}
+
+func (h HTTPAuthSecurityScheme) GetType() string {
+	return "http"
+}
+
+// OAuth2SecurityScheme OAuth Security scheme configuration
+type OAuth2SecurityScheme struct {
+	Description string `json:"description"`
+	Flows       any    `json:"flows"`
+	Type        string `json:"type"`
+}
+
+func (h OAuth2SecurityScheme) GetType() string {
+	return "oauth2"
+}
+
+type OpenIdConnectSecurityScheme struct {
+	Description      string `json:"description,omitempty"`
+	OpenIdConnectUrl string `json:"open_id_connect_url,omitempty"`
+	Type             string `json:"type,omitempty"`
+}
+
+func (h OpenIdConnectSecurityScheme) GetType() string {
+	return "openIdConnect"
+}
+
+type OAuthFlows struct {
+	AuthorizationCode AuthorizationCodeOAuthFlow `json:"authorization_code,omitempty"`
+	ClientCredentials ClientCredentialsOAuthFlow `json:"client_credentials,omitempty"`
+}
+
+type AuthorizationCodeOAuthFlow struct {
+	AuthorizationUrl string            `json:"authorization_url,omitempty"`
+	RefreshUrl       string            `json:"refresh_url,omitempty"`
+	Scopes           map[string]string `json:"scopes,omitempty"`
+	TokenUrl         string            `json:"token_url,omitempty"`
+}
+
+type ImplicitOAuthFlow struct {
+	AuthorizationUrl string            `json:"authorization_url,omitempty"`
+	RefreshUrl       string            `json:"refresh_url,omitempty"`
+	Scopes           map[string]string `json:"scopes,omitempty"`
 }
 
 // ClientCredentialsOAuthFlow Configuration details for a supported OAuth Flow
