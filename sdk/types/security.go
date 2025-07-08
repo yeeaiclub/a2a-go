@@ -27,7 +27,7 @@ type APIKeySecurityScheme struct {
 }
 
 func (a APIKeySecurityScheme) GetType() string {
-	return "api_key"
+	return APIKEY
 }
 
 // HTTPAuthSecurityScheme HTTP Authentication security scheme.
@@ -39,7 +39,7 @@ type HTTPAuthSecurityScheme struct {
 }
 
 func (h HTTPAuthSecurityScheme) GetType() string {
-	return "http"
+	return HTTP
 }
 
 // OAuth2SecurityScheme OAuth Security scheme configuration
@@ -50,7 +50,7 @@ type OAuth2SecurityScheme struct {
 }
 
 func (h OAuth2SecurityScheme) GetType() string {
-	return "oauth2"
+	return OAUTH2
 }
 
 type OpenIdConnectSecurityScheme struct {
@@ -60,7 +60,7 @@ type OpenIdConnectSecurityScheme struct {
 }
 
 func (h OpenIdConnectSecurityScheme) GetType() string {
-	return "openIdConnect"
+	return OPENIDConnect
 }
 
 type OAuthFlows struct {
@@ -95,4 +95,11 @@ const (
 	InCookie In = "cookie"
 	InHeader In = "header"
 	InQuery  In = "query"
+)
+
+const (
+	APIKEY        = "api_key"
+	HTTP          = "http"
+	OAUTH2        = "oauth2"
+	OPENIDConnect = "openIdConnect"
 )

@@ -14,6 +14,8 @@
 
 package types
 
+type SecurityRequirement []map[string][]string
+
 type AgentCard struct {
 	Name               string                    `json:"name"`
 	Description        string                    `json:"description"`
@@ -25,7 +27,7 @@ type AgentCard struct {
 	Capabilities       *AgentCapabilities        `json:"capabilities,omitempty"`
 	Version            string                    `json:"version"`
 	IconUrl            string                    `json:"icon_url,omitempty"`
-	Security           []map[string][]string     `json:"security,omitempty"`
+	Security           SecurityRequirement       `json:"security,omitempty"`
 	SecuritySchemes    map[string]SecurityScheme `json:"security_schemes,omitempty"`
 }
 
