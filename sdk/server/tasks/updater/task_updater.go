@@ -42,7 +42,7 @@ func (t *TaskUpdater) UpdateStatus(state types.TaskState, opts ...TaskUpdaterOpt
 		option.timeStamp = time.Now().Format(time.RFC3339)
 	}
 
-	t.queue.Enqueue(&types.TaskStatusUpdateEvent{
+	task := &types.TaskStatusUpdateEvent{
 		TaskId:    t.taskId,
 		ContextId: t.contextId,
 		Final:     option.final,
@@ -51,7 +51,13 @@ func (t *TaskUpdater) UpdateStatus(state types.TaskState, opts ...TaskUpdaterOpt
 			State:     state,
 			TimeStamp: option.timeStamp,
 		},
-	})
+	}
+
+	if option.final {
+		t.queue.EnqueueDone(task)
+		return
+	}
+	t.queue.Enqueue(task)
 }
 
 func (t *TaskUpdater) AddArtifact(parts []types.Part, opts ...TaskUpdaterOption) {
@@ -64,7 +70,7 @@ func (t *TaskUpdater) AddArtifact(parts []types.Part, opts ...TaskUpdaterOption)
 		option.artifactId = uuid.New().String()
 	}
 
-	t.queue.Enqueue(&types.TaskArtifactUpdateEvent{
+	t.queue.EnqueueDone(&types.TaskArtifactUpdateEvent{
 		TaskId:    t.taskId,
 		ContextId: t.contextId,
 		Artifact: &types.Artifact{

@@ -37,12 +37,14 @@ func TestConsumeAll(t *testing.T) {
 		{
 			name: "consumer all",
 			before: func(q *event.Queue, store *tasks.InMemoryTaskStore) {
-				err := store.Save(context.Background(), &types.Task{Id: "1"})
+				task := &types.Task{Id: "1", ContextId: "2"}
+				err := store.Save(context.Background(), task)
 				require.NoError(t, err)
+
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
+				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
-			want: &types.Task{Id: "1"},
+			want: &types.Task{Id: "1", ContextId: "2"},
 		},
 	}
 
@@ -57,9 +59,9 @@ func TestConsumeAll(t *testing.T) {
 				store,
 				manager.WithTaskId("1"),
 				manager.WithContextId("2"))
-			consumer := event.NewConsumer(queue, nil)
+
 			aggregator := NewResultAggregator(taskManger)
-			all, err := aggregator.ConsumeAll(context.Background(), consumer)
+			all, err := aggregator.ConsumeAll(context.Background(), queue)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, all)
 		})
@@ -78,18 +80,18 @@ func TestConsumeAndEmit(t *testing.T) {
 				err := store.Save(context.Background(), &types.Task{Id: "1"})
 				require.NoError(t, err)
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
+				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
 			want: []types.StreamEvent{
-				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false}},
-				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true}},
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false}, Type: types.EventData},
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true}, Type: types.EventDone},
 			},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			queue := event.NewQueue(10)
+			queue := event.NewQueue(2)
 			defer queue.Close()
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(queue, store)
@@ -98,10 +100,9 @@ func TestConsumeAndEmit(t *testing.T) {
 				store,
 				manager.WithTaskId("1"),
 				manager.WithContextId("2"))
-			consumer := event.NewConsumer(queue, nil)
 			aggregator := NewResultAggregator(taskManger)
 
-			events := aggregator.ConsumeAndEmit(context.Background(), consumer)
+			events := aggregator.ConsumeAndEmit(context.Background(), queue)
 
 			var received []types.StreamEvent
 			for ev := range events {
@@ -129,7 +130,7 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 				require.NoError(t, err)
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "3", Final: true})
+				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "3", Final: true})
 			},
 			want:        &types.Task{Id: "1"},
 			expectError: nil,
@@ -141,7 +142,7 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 				require.NoError(t, err)
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false, Status: types.TaskStatus{State: types.AUTH_REQUIRED}})
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "3", Final: true})
+				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "3", Final: true})
 			},
 			want:        &types.Task{Id: "1"},
 			expectError: errs.ErrAuthRequired,
@@ -159,9 +160,8 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 				store,
 				manager.WithTaskId("1"),
 				manager.WithContextId("2"))
-			consumer := event.NewConsumer(queue, nil)
 			aggregator := NewResultAggregator(taskManger)
-			events, err := aggregator.ConsumeAndBreakOnInterrupt(context.Background(), consumer)
+			events, err := aggregator.ConsumeAndBreakOnInterrupt(context.Background(), queue)
 			if tc.expectError != nil {
 				require.ErrorIs(t, err, tc.expectError)
 				return

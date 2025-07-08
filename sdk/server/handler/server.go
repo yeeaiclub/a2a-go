@@ -278,7 +278,7 @@ func (s *Server) handleResubscribeToTask(ctx context.Context, w http.ResponseWri
 				return
 			}
 			flusher.Flush()
-			if ev.Done() {
+			if ev.Type == types.EventDone {
 				return
 			}
 		}

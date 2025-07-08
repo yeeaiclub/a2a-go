@@ -16,75 +16,83 @@ package event
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 
-	"github.com/yeeaiclub/a2a-go/internal/errs"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 type Queue struct {
-	sync.Mutex
-	cap      int
-	queue    chan types.Event
-	closed   atomic.Bool
-	children []*Queue
+	closed atomic.Bool
+	ch     chan types.StreamEvent
+	size   uint
 }
 
-const DefaultMaxQueueSize = 1024
-
-func NewQueue(size int) *Queue {
-	if size < 0 {
-		return nil
-	}
-	if size == 0 {
-		size = DefaultMaxQueueSize
-	}
-	return &Queue{cap: size, queue: make(chan types.Event, size)}
+func NewQueue(size uint) *Queue {
+	return &Queue{ch: make(chan types.StreamEvent, size), size: size}
 }
 
-func (q *Queue) DequeueWait(ctx context.Context) types.StreamEvent {
+func (q *Queue) Enqueue(data types.Event) bool {
+	if q.closed.Load() {
+		return false
+	}
 	select {
-	case <-ctx.Done():
-		return types.StreamEvent{Err: ctx.Err()}
-	case event, ok := <-q.queue:
-		if !ok {
-			return types.StreamEvent{Closed: true}
-		}
-		return types.StreamEvent{Event: event}
-	}
-}
-
-func (q *Queue) DequeueNoWait(ctx context.Context) types.StreamEvent {
-	select {
-	case <-ctx.Done():
-		return types.StreamEvent{Err: ctx.Err()}
-	case event, ok := <-q.queue:
-		if !ok {
-			return types.StreamEvent{Closed: true}
-		}
-		return types.StreamEvent{Event: event}
-	default:
-		return types.StreamEvent{Err: errs.ErrQueueEmpty}
-	}
-}
-
-func (q *Queue) Enqueue(event types.Event) bool {
-	select {
-	case q.queue <- event:
-		for _, ch := range q.children {
-			ch.Enqueue(event)
-		}
+	case q.ch <- types.StreamEvent{Type: types.EventData, Event: data}:
 		return true
 	default:
 		return false
 	}
 }
 
+func (q *Queue) EnqueueDone(data types.Event) bool {
+	if q.closed.Load() {
+		return false
+	}
+	select {
+	case q.ch <- types.StreamEvent{Type: types.EventDone, Event: data}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (q *Queue) EnqueueError(err error) bool {
+	if q.closed.Load() {
+		return false
+	}
+	select {
+	case q.ch <- types.StreamEvent{Type: types.EventError, Err: err}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (q *Queue) Subscribe(ctx context.Context) <-chan types.StreamEvent {
+	out := make(chan types.StreamEvent, q.size)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-ctx.Done():
+				out <- types.StreamEvent{Type: types.EventCanceled, Err: ctx.Err()}
+				return
+			case e, ok := <-q.ch:
+				if !ok {
+					out <- types.StreamEvent{Type: types.EventClosed}
+					return
+				}
+				out <- e
+				if e.Type == types.EventDone {
+					return
+				}
+			}
+		}
+	}()
+	return out
+}
+
 func (q *Queue) Close() {
-	q.closed.Store(true)
-	close(q.queue)
-	for _, ch := range q.children {
-		ch.Close()
+	if q.closed.CompareAndSwap(false, true) {
+		close(q.ch)
 	}
 }

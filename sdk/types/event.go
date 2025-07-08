@@ -14,11 +14,7 @@
 
 package types
 
-import (
-	"encoding/json"
-	"fmt"
-	"io"
-)
+import "encoding/json"
 
 type Event interface {
 	GetTaskId() string
@@ -80,47 +76,10 @@ func (t *TaskStatusUpdateEvent) EventType() string {
 	return "status_update"
 }
 
-// StreamEvent the wrap of many events
 type StreamEvent struct {
-	Err    error
-	Event  Event
-	Closed bool
-}
-
-func (s *StreamEvent) Done() bool {
-	return s.Event.Done() || s.Closed
-}
-
-func (s *StreamEvent) GetContextId() string {
-	return s.Event.GetContextId()
-}
-
-func (s *StreamEvent) GetTaskId() string {
-	return s.Event.GetTaskId()
-}
-
-func (s *StreamEvent) EventType() string {
-	return s.Event.EventType()
-}
-
-func (s *StreamEvent) MarshalTo(w io.Writer, id string) error {
-	if s.Err != nil {
-		data, _ := json.Marshal(InternalError())
-		if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
-			return err
-		}
-		return nil
-	}
-	successResp := JSONRPCSuccessResponse(id, s.Event)
-	data, err := json.Marshal(successResp)
-	if err != nil {
-		return err
-	}
-
-	if _, err := fmt.Fprintf(w, "data: %s\n\n", data); err != nil {
-		return err
-	}
-	return nil
+	Type  EventType
+	Event Event
+	Err   error
 }
 
 func (s *StreamEvent) EncodeJSONRPC(encoder *json.Encoder, id string) error {
@@ -134,3 +93,13 @@ func (s *StreamEvent) EncodeJSONRPC(encoder *json.Encoder, id string) error {
 	}
 	return nil
 }
+
+type EventType int
+
+const (
+	EventData EventType = iota
+	EventError
+	EventDone
+	EventClosed
+	EventCanceled
+)
