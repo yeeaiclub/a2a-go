@@ -69,7 +69,7 @@ func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryPa
 }
 
 func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error) {
-	taskManger := manager.NewTaskManger(
+	taskManager := manager.NewTaskManger(
 		d.store,
 		manager.WithTaskId(params.Message.TaskID),
 		manager.WithContextId(params.Message.ContextID),
@@ -85,7 +85,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 		if d.IsTerminalTaskSates(task.Status.State) {
 			return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
 		}
-		task = taskManger.UpdateWithMessage(params.Message, task)
+		task = taskManager.UpdateWithMessage(params.Message, task)
 		if d.shouldAddPushInfo(params) {
 			err = d.pushNotifier.SetInfo(ctx, task.Id, params.Configuration.PushNotificationConfig)
 			if err != nil {
@@ -109,16 +109,13 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	if err != nil {
 		return nil, err
 	}
-	defer queue.Close()
 
-	done := d.execute(ctx, reqContext, queue)
-
-	consumer := event.NewConsumer(queue, done)
+	d.execute(ctx, reqContext, queue)
 	resultAggregator := aggregator.NewResultAggregator(
-		taskManger,
+		taskManager,
 		aggregator.WithBatchSize(10),
 	)
-	ev, err := resultAggregator.ConsumeAndBreakOnInterrupt(ctx, consumer)
+	ev, err := resultAggregator.ConsumeAndBreakOnInterrupt(ctx, queue)
 	if err != nil {
 		return nil, err
 	}
@@ -130,27 +127,31 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 }
 
 func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent {
-	ch := make(chan types.StreamEvent, 1)
-	defer close(ch)
-	taskManger := manager.NewTaskManger(
+	errorStream := func(err error) <-chan types.StreamEvent {
+		ch := make(chan types.StreamEvent, 1)
+		ch <- types.StreamEvent{Type: types.EventError, Err: err}
+		close(ch)
+		return ch
+	}
+
+	taskManager := manager.NewTaskManger(
 		d.store,
 		manager.WithTaskId(params.Message.TaskID),
 		manager.WithContextId(params.Message.ContextID),
 		manager.WithInitMessage(params.Message),
 	)
 
-	task, err := taskManger.GetTask(ctx)
+	task, err := taskManager.GetTask(ctx)
 	if err != nil {
-		ch <- types.StreamEvent{Err: err}
-		return ch
+		return errorStream(err)
 	}
 	if task == nil {
 		task = &types.Task{Id: uuid.New().String()}
 	}
+
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
 	if err != nil {
-		ch <- types.StreamEvent{Err: err}
-		return ch
+		return errorStream(err)
 	}
 
 	reqCtx := execution.NewRequestContext(
@@ -160,12 +161,10 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 		execution.WithTask(task),
 	)
 
-	errCh := d.execute(ctx, reqCtx, queue)
-	consumer := event.NewConsumer(queue, errCh)
+	d.execute(ctx, reqCtx, queue)
 
-	rg := aggregator.NewResultAggregator(taskManger, aggregator.WithBatchSize(10))
-	events := rg.ConsumeAndEmit(ctx, consumer)
-	return events
+	resultAggregator := aggregator.NewResultAggregator(taskManager, aggregator.WithBatchSize(10))
+	return resultAggregator.ConsumeAndEmit(ctx, queue)
 }
 
 // OnCancelTask attempts to cancel the task manged by agentExecutor
@@ -175,13 +174,13 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 		return nil, err
 	}
 
-	taskManger := manager.NewTaskManger(
+	taskManager := manager.NewTaskManger(
 		d.store,
 		manager.WithTaskId(task.Id),
 		manager.WithContextId(task.ContextId),
 	)
 
-	rg := aggregator.NewResultAggregator(taskManger, aggregator.WithBatchSize(10))
+	rg := aggregator.NewResultAggregator(taskManager, aggregator.WithBatchSize(10))
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
 	if err != nil {
 		return nil, err
@@ -190,12 +189,10 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 		queue = event.NewQueue(0)
 		defer queue.Close()
 	}
-	defer queue.Close()
 
 	reqCtx := execution.NewRequestContext()
-	done := d.cancel(ctx, reqCtx, queue)
-	consumer := event.NewConsumer(queue, done)
-	result, err := rg.ConsumeAll(ctx, consumer)
+	d.cancel(ctx, reqCtx, queue)
+	result, err := rg.ConsumeAll(ctx, queue)
 	if err != nil {
 		return nil, err
 	}
@@ -244,51 +241,51 @@ func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, pa
 }
 
 func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent {
-	errCh := make(chan types.StreamEvent, 1)
-	defer close(errCh)
+	errorStream := func(err error) <-chan types.StreamEvent {
+		ch := make(chan types.StreamEvent, 1)
+		ch <- types.StreamEvent{Type: types.EventError, Err: err}
+		close(ch)
+		return ch
+	}
+
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
-		errCh <- types.StreamEvent{Err: err}
-		return errCh
+		return errorStream(err)
+	}
+	if task == nil || task.Id == "" {
+		return errorStream(errs.ErrTaskNotFound)
 	}
 
-	if task == nil {
-		errCh <- types.StreamEvent{Err: errs.ErrTaskNotFound}
-		return errCh
-	}
-
-	manger := manager.NewTaskManger(
+	taskManager := manager.NewTaskManger(
 		d.store,
 		manager.WithTaskId(task.Id),
 		manager.WithContextId(task.ContextId),
 	)
-	rg := aggregator.NewResultAggregator(manger, aggregator.WithBatchSize(10))
-	// todo: close the queue
-	queue, err := d.queueManger.Tap(ctx, task.Id)
+	resultAggregator := aggregator.NewResultAggregator(taskManager, aggregator.WithBatchSize(10))
+	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
 	if err != nil {
-		errCh <- types.StreamEvent{Err: err}
-		return errCh
+		return errorStream(err)
 	}
-	consumer := event.NewConsumer(queue, nil)
-	return rg.ConsumeAndEmit(ctx, consumer)
+	return resultAggregator.ConsumeAndEmit(ctx, queue)
 }
 
-func (d *DefaultHandler) execute(ctx context.Context, reqCtx *execution.RequestContext, queue *event.Queue) chan error {
-	ch := make(chan error, 1)
+func (d *DefaultHandler) execute(ctx context.Context, reqCtx *execution.RequestContext, queue *event.Queue) {
 	go func() {
-		defer close(ch)
-		ch <- d.executor.Execute(ctx, reqCtx, queue)
+		defer queue.Close()
+		err := d.executor.Execute(ctx, reqCtx, queue)
+		if err != nil {
+			queue.EnqueueError(err)
+		}
 	}()
-	return ch
 }
 
-func (d *DefaultHandler) cancel(ctx context.Context, reqCtx *execution.RequestContext, queue *event.Queue) chan error {
-	ch := make(chan error, 1)
+func (d *DefaultHandler) cancel(ctx context.Context, reqCtx *execution.RequestContext, queue *event.Queue) {
 	go func() {
-		defer close(ch)
-		ch <- d.executor.Cancel(ctx, reqCtx, queue)
+		err := d.executor.Cancel(ctx, reqCtx, queue)
+		if err != nil {
+			queue.EnqueueError(err)
+		}
 	}()
-	return ch
 }
 
 func (d *DefaultHandler) shouldAddPushInfo(params types.MessageSendParam) bool {

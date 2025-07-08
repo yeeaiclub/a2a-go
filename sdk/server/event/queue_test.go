@@ -16,8 +16,8 @@ package event
 
 import (
 	"context"
+	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
@@ -25,42 +25,62 @@ import (
 
 func TestEnqueue(t *testing.T) {
 	testcases := []struct {
-		name  string
-		input types.Event
-		size  int
+		name   string
+		before func(queue *Queue)
+		want   []types.StreamEvent
 	}{
 		{
-			name:  "enqueue",
-			size:  1,
-			input: &types.TaskStatusUpdateEvent{TaskId: "1", Final: true},
+			name: "enqueue and done",
+			before: func(queue *Queue) {
+				queue.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
+				queue.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: true})
+			},
+			want: []types.StreamEvent{
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false}, Type: types.EventData},
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: true}, Type: types.EventDone},
+			},
+		},
+		{
+			name: "enqueue and error",
+			before: func(queue *Queue) {
+				queue.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
+				queue.EnqueueError(errors.New("error"))
+			},
+			want: []types.StreamEvent{
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false}, Type: types.EventData},
+				{Err: errors.New("error"), Type: types.EventError},
+			},
 		},
 	}
-
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			queue := NewQueue(tc.size)
-			defer queue.Close()
-			queue.Enqueue(tc.input)
-			event := <-queue.queue
-			assert.Equal(t, event, tc.input)
+			queue := NewQueue(2)
+			tc.before(queue)
+			queue.Close()
+			list := make([]types.StreamEvent, 0)
+			for e := range queue.ch {
+				list = append(list, e)
+			}
+			assert.ElementsMatch(t, tc.want, list)
 		})
 	}
 }
 
-func TestDequeueNoWait(t *testing.T) {
+func TestSubscribe(t *testing.T) {
 	testcases := []struct {
 		name   string
-		before func(q *Queue)
-		want   types.Event
+		before func(queue *Queue)
+		want   []types.StreamEvent
 	}{
 		{
-			name: "dequeue not wait",
-			before: func(q *Queue) {
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", Final: true})
+			name: "subscribe",
+			before: func(queue *Queue) {
+				queue.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
+				queue.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: true})
 			},
-			want: &types.TaskStatusUpdateEvent{
-				TaskId: "1",
-				Final:  true,
+			want: []types.StreamEvent{
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false}, Type: types.EventData},
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: true}, Type: types.EventDone},
 			},
 		},
 	}
@@ -70,36 +90,12 @@ func TestDequeueNoWait(t *testing.T) {
 			queue := NewQueue(2)
 			defer queue.Close()
 			tc.before(queue)
-			wait := queue.DequeueNoWait(context.Background())
-			assert.Equal(t, tc.want, wait.Event)
-		})
-	}
-}
-
-func TestDequeueWait(t *testing.T) {
-	testcases := []struct {
-		name   string
-		before func(q *Queue)
-		want   types.Event
-	}{
-		{
-			name: "dequeue wait",
-			before: func(q *Queue) {
-				go func() {
-					time.Sleep(2 * time.Second)
-					q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", Final: true})
-				}()
-			},
-			want: &types.TaskStatusUpdateEvent{TaskId: "1", Final: true},
-		},
-	}
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			queue := NewQueue(2)
-			defer queue.Close()
-			tc.before(queue)
-			wait := queue.DequeueWait(context.Background())
-			assert.Equal(t, tc.want, wait.Event)
+			events := queue.Subscribe(context.Background())
+			list := make([]types.StreamEvent, 0)
+			for ev := range events {
+				list = append(list, ev)
+			}
+			assert.ElementsMatch(t, tc.want, list)
 		})
 	}
 }
