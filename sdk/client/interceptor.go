@@ -36,7 +36,6 @@ func (i *Interceptor) Intercept(request *http.Request, ctx *CallContext, agentCa
 			if err != nil {
 				continue
 			}
-			// 如果凭据为空，跳过设置头部
 			if credential == "" {
 				continue
 			}
