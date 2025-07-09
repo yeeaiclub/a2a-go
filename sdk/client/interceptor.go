@@ -33,14 +33,13 @@ func (i *Interceptor) Intercept(request *http.Request, ctx *client.CallContext, 
 				if o.In == "header" {
 					request.Header.Set(o.Name, credential)
 				}
-				return
-			case types.OAUTH2, types.OPENIDConnect:
-				request.Header.Set("Authorization", "Bearer "+credential)
 			case types.HTTP:
 				s := scheme.(types.HTTPAuthSecurityScheme)
 				if strings.ToLower(s.Scheme) == "bearer" {
 					request.Header.Set("Authorization", "Bearer "+credential)
 				}
+			case types.OAUTH2, types.OPENIDConnect:
+				request.Header.Set("Authorization", "Bearer "+credential)
 			}
 		}
 	}
