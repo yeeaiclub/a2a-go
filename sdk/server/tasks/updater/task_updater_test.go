@@ -15,30 +15,129 @@
 package updater
 
 import (
+	"context"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/yeeaiclub/a2a-go/sdk/server/event"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
-func TestUpdateStatus(t *testing.T) {
-	testcases := []struct {
+func TestTaskUpdater_UpdateStatus(t *testing.T) {
+	tests := []struct {
 		name      string
 		taskId    string
 		contextId string
 		state     types.TaskState
+		final     bool
 	}{
-		{
-			name: "update status",
-		},
+		{"working status", "tid", "cid", types.WORKING, false},
+		{"completed status", "tid", "cid", types.COMPLETED, true},
+		{"failed status", "tid", "cid", types.FAILED, false},
+		{"rejected status", "tid", "cid", types.REJECTED, false},
 	}
 
-	for _, tc := range testcases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			queue := event.NewQueue(10)
 			defer queue.Close()
 			updater := NewTaskUpdater(queue, tc.taskId, tc.contextId)
-			updater.UpdateStatus(tc.state)
+			if tc.final {
+				updater.UpdateStatus(tc.state, WithFinal(true))
+			} else {
+				updater.UpdateStatus(tc.state)
+			}
+			ch := queue.Subscribe(context.Background())
+			e := <-ch
+			statusEvent, ok := e.Event.(*types.TaskStatusUpdateEvent)
+			assert.True(t, ok)
+			assert.Equal(t, tc.taskId, statusEvent.TaskId)
+			assert.Equal(t, tc.contextId, statusEvent.ContextId)
+			assert.Equal(t, tc.state, statusEvent.Status.State)
+			if tc.final {
+				assert.True(t, statusEvent.Final)
+			} else {
+				assert.False(t, statusEvent.Final)
+			}
+			assert.NotEmpty(t, statusEvent.Status.TimeStamp)
 		})
 	}
+}
+
+func TestTaskUpdater_Complete_Failed_Reject(t *testing.T) {
+	tests := []struct {
+		name  string
+		fn    func(updater *TaskUpdater)
+		state types.TaskState
+		final bool
+	}{
+		{"complete", func(u *TaskUpdater) { u.Complete(WithFinal(true)) }, types.COMPLETED, true},
+		{"failed", func(u *TaskUpdater) { u.Failed() }, types.FAILED, false},
+		{"reject", func(u *TaskUpdater) { u.Reject() }, types.REJECTED, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			queue := event.NewQueue(10)
+			updater := NewTaskUpdater(queue, "tid", "cid")
+			tc.fn(updater)
+			ch := queue.Subscribe(context.Background())
+			e := <-ch
+			statusEvent, ok := e.Event.(*types.TaskStatusUpdateEvent)
+			assert.True(t, ok)
+			assert.Equal(t, tc.state, statusEvent.Status.State)
+			if tc.final {
+				assert.True(t, statusEvent.Final)
+			}
+			queue.Close()
+		})
+	}
+}
+
+func TestTaskUpdater_AddArtifact(t *testing.T) {
+	t.Run("add artifact", func(t *testing.T) {
+		queue := event.NewQueue(10)
+		defer queue.Close()
+		updater := NewTaskUpdater(queue, "tid", "cid")
+		parts := []types.Part{&types.TextPart{Kind: "text", Text: "hello"}}
+		updater.AddArtifact(parts, WithName("artifact1"))
+		ch := queue.Subscribe(context.Background())
+		e := <-ch
+		artifactEvent, ok := e.Event.(*types.TaskArtifactUpdateEvent)
+		assert.True(t, ok)
+		assert.Equal(t, "tid", artifactEvent.TaskId)
+		assert.Equal(t, "cid", artifactEvent.ContextId)
+		assert.NotNil(t, artifactEvent.Artifact)
+		assert.Equal(t, "artifact1", artifactEvent.Artifact.Name)
+		assert.Len(t, artifactEvent.Artifact.Parts, 1)
+	})
+}
+
+func TestTaskUpdater_NewAgentMessage(t *testing.T) {
+	t.Run("new agent message", func(t *testing.T) {
+		updater := NewTaskUpdater(nil, "tid", "cid")
+		parts := []types.Part{&types.TextPart{Kind: "text", Text: "msg"}}
+		msg := updater.NewAgentMessage(parts, WithMetadata(map[string]any{"foo": "bar"}))
+		assert.Equal(t, types.Agent, msg.Role)
+		assert.Equal(t, "tid", msg.TaskID)
+		assert.Equal(t, "cid", msg.ContextID)
+		assert.Len(t, msg.Parts, 1)
+		assert.Equal(t, "bar", msg.Metadata["foo"])
+		assert.NotEmpty(t, msg.MessageID)
+	})
+}
+
+func TestTaskUpdater_TimestampOption(t *testing.T) {
+	t.Run("timestamp option", func(t *testing.T) {
+		queue := event.NewQueue(10)
+		defer queue.Close()
+		updater := NewTaskUpdater(queue, "tid", "cid")
+		ts := time.Now().Add(-time.Hour).Format(time.RFC3339)
+		updater.UpdateStatus(types.SUBMITTED, WithTimestamp(ts))
+		ch := queue.Subscribe(context.Background())
+		e := <-ch
+		statusEvent, ok := e.Event.(*types.TaskStatusUpdateEvent)
+		assert.True(t, ok)
+		assert.Equal(t, ts, statusEvent.Status.TimeStamp)
+	})
 }

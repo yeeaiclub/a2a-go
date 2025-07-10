@@ -73,9 +73,3 @@ func WithTask(task *types.Task) RequestContextOption {
 		ctx.Task = task
 	})
 }
-
-func WithServerContext(callContext server.CallContext) RequestContextOption {
-	return RequestContextOptionFunc(func(ctx *RequestContext) {
-		ctx.CallContext = callContext
-	})
-}
