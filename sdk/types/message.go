@@ -16,7 +16,8 @@ package types
 
 import (
 	"encoding/json"
-	"fmt"
+
+	"github.com/yeeaiclub/a2a-go/internal/jsonx"
 )
 
 type Role string
@@ -66,39 +67,18 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
 	}
-	m.Parts = nil
-	for _, raw := range aux.Parts {
-		var kindHolder struct {
-			Kind string `json:"kind"`
-		}
-		if err := json.Unmarshal(raw, &kindHolder); err != nil {
-			return err
-		}
 
-		var part Part
-		switch kindHolder.Kind {
-		case "text":
-			var tp TextPart
-			if err := json.Unmarshal(raw, &tp); err != nil {
-				return err
-			}
-			part = &tp
-		case "data":
-			var dp DataPart
-			if err := json.Unmarshal(raw, &dp); err != nil {
-				return err
-			}
-			part = &dp
-		case "file":
-			var fp FilePart
-			if err := json.Unmarshal(raw, &fp); err != nil {
-				return err
-			}
-			part = &fp
-		default:
-			return fmt.Errorf("unknown part kind: %q", kindHolder.Kind)
-		}
-		m.Parts = append(m.Parts, part)
+	kindMap := map[string]func() Part{
+		"text": func() Part { return &TextPart{} },
+		"data": func() Part { return &DataPart{} },
+		"file": func() Part { return &FilePart{} },
 	}
+
+	parts, err := jsonx.UnmarshalSliceByKind(aux.Parts, kindMap)
+	if err != nil {
+		return err
+	}
+
+	m.Parts = parts
 	return nil
 }

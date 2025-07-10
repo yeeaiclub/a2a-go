@@ -22,7 +22,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yeeaiclub/a2a-go/sdk/client/middleware"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/web"
 )
 
 func TestSendMessage(t *testing.T) {
@@ -219,4 +221,151 @@ func TestMessageStream(t *testing.T) {
 			assert.Equal(t, string(events[0].Status.State), string(types.COMPLETED))
 		})
 	}
+}
+
+func TestApply(t *testing.T) {
+	tests := []struct {
+		name            string
+		setupClient     func() *A2AClient
+		setupContext    func() web.Context
+		expectedHeaders map[string]string
+		expectedError   bool
+	}{
+		{
+			name: "no middleware",
+			setupClient: func() *A2AClient {
+				return NewClient(&http.Client{}, "http://example.com")
+			},
+			setupContext: func() web.Context {
+				ctx := middleware.NewCallContext(1)
+				req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
+				ctx.SetRequest(req)
+				return ctx
+			},
+			expectedHeaders: map[string]string{},
+			expectedError:   false,
+		},
+		{
+			name: "with authentication middleware",
+			setupClient: func() *A2AClient {
+				client := NewClient(&http.Client{}, "http://example.com")
+				credential := middleware.NewInMemoryContextCredentials()
+				credential.SetCredentials("session1", "apiKey", "api-token-123")
+
+				client.Use(middleware.Intercept(credential))
+				client.card = &types.AgentCard{
+					Security: types.SecurityRequirement{
+						{"apiKey": []string{}},
+					},
+					SecuritySchemes: map[string]types.SecurityScheme{
+						"apiKey": types.APIKeySecurityScheme{
+							Type: types.APIKEY,
+							In:   types.InHeader,
+							Name: "X-API-Key",
+						},
+					},
+				}
+				return client
+			},
+			setupContext: func() web.Context {
+				ctx := middleware.NewCallContext(1)
+				ctx.SetSecurityConfig(
+					types.SecurityRequirement{
+						{"apiKey": []string{}},
+					},
+					map[string]types.SecurityScheme{
+						"apiKey": types.APIKeySecurityScheme{
+							Type: types.APIKEY,
+							In:   types.InHeader,
+							Name: "X-API-Key",
+						},
+					})
+				ctx.Set("sessionId", "session1")
+				req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
+				ctx.SetRequest(req)
+				return ctx
+			},
+			expectedHeaders: map[string]string{
+				"X-API-Key": "api-token-123",
+			},
+			expectedError: false,
+		},
+		{
+			name: "middleware error",
+			setupClient: func() *A2AClient {
+				client := NewClient(&http.Client{}, "http://example.com")
+				errorMiddleware := func(next web.HandlerFunc) web.HandlerFunc {
+					return func(ctx web.Context) error {
+						return assert.AnError
+					}
+				}
+				client.Use(errorMiddleware)
+
+				return client
+			},
+			setupContext: func() web.Context {
+				ctx := middleware.NewCallContext(1)
+				req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
+				ctx.SetRequest(req)
+				return ctx
+			},
+			expectedHeaders: map[string]string{},
+			expectedError:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := tt.setupClient()
+			ctx := tt.setupContext()
+
+			err := client.apply(ctx)
+
+			if tt.expectedError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			for expectedHeader, expectedValue := range tt.expectedHeaders {
+				actualValue := ctx.Request().Header.Get(expectedHeader)
+				assert.Equal(t, expectedValue, actualValue,
+					"Header %s should be set to %s, but got %s",
+					expectedHeader, expectedValue, actualValue)
+			}
+
+			if len(tt.expectedHeaders) == 0 {
+				assert.Empty(t, ctx.Request().Header)
+			}
+		})
+	}
+}
+
+func TestA2AClient_Use(t *testing.T) {
+	t.Run("test use", func(t *testing.T) {
+		client := NewClient(&http.Client{}, "http://example.com")
+
+		assert.Empty(t, client.middlewares)
+
+		middleware1 := func(next web.HandlerFunc) web.HandlerFunc {
+			return func(ctx web.Context) error {
+				return next(ctx)
+			}
+		}
+		client.Use(middleware1)
+		assert.Len(t, client.middlewares, 1)
+
+		middleware2 := func(next web.HandlerFunc) web.HandlerFunc {
+			return func(ctx web.Context) error {
+				return next(ctx)
+			}
+		}
+		middleware3 := func(next web.HandlerFunc) web.HandlerFunc {
+			return func(ctx web.Context) error {
+				return next(ctx)
+			}
+		}
+		client.Use(middleware2, middleware3)
+		assert.Len(t, client.middlewares, 3)
+	})
 }

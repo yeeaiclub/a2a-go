@@ -82,7 +82,7 @@ func (q *Queue) Subscribe(ctx context.Context) <-chan types.StreamEvent {
 					return
 				}
 				out <- e
-				if e.Type == types.EventDone {
+				if e.Type == types.EventDone || e.Type == types.EventError {
 					return
 				}
 			}

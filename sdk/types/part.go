@@ -27,6 +27,7 @@ type Part interface {
 type FileContent interface {
 	GetMimeType() string
 	GetName() string
+	GetKind() string
 }
 
 // DataPart Represents a structured data segment within a message part.
@@ -58,6 +59,33 @@ func (f *FilePart) GetMetadata() map[string]any {
 	return f.Metadata
 }
 
+func UnmarshalFileContent(data json.RawMessage) (FileContent, error) {
+	var probe struct {
+		Bytes *string `json:"bytes,omitempty"`
+		Url   *string `json:"url,omitempty"`
+	}
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return nil, fmt.Errorf("failed to probe file content: %w", err)
+	}
+
+	switch {
+	case probe.Bytes != nil:
+		var withBytes FileWithBytes
+		if err := json.Unmarshal(data, &withBytes); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal FileWithBytes: %w", err)
+		}
+		return &withBytes, nil
+	case probe.Url != nil:
+		var withUrl FileWithUrl
+		if err := json.Unmarshal(data, &withUrl); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal FileWithUrl: %w", err)
+		}
+		return &withUrl, nil
+	default:
+		return nil, fmt.Errorf("unknown file content type")
+	}
+}
+
 func (f *FilePart) UnmarshalJSON(data []byte) error {
 	aux := &struct {
 		File     json.RawMessage `json:"file"`
@@ -71,30 +99,13 @@ func (f *FilePart) UnmarshalJSON(data []byte) error {
 
 	f.Kind = aux.Kind
 	f.Metadata = aux.Metadata
-	var probe struct {
-		Bytes *string `json:"bytes,omitempty"`
-		Url   *string `json:"url,omitempty"`
-	}
-	if err := json.Unmarshal(aux.File, &probe); err != nil {
-		return err
+
+	fileContent, err := UnmarshalFileContent(aux.File)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal file content: %w", err)
 	}
 
-	switch {
-	case probe.Bytes != nil:
-		var withBytes FileWithBytes
-		if err := json.Unmarshal(aux.File, &withBytes); err != nil {
-			return err
-		}
-		f.File = &withBytes
-	case probe.Url != nil:
-		var withUrl FileWithUrl
-		if err := json.Unmarshal(aux.File, &withUrl); err != nil {
-			return err
-		}
-		f.File = &withUrl
-	default:
-		return fmt.Errorf("unknown file type in FilePart")
-	}
+	f.File = fileContent
 	return nil
 }
 
@@ -116,6 +127,10 @@ func (fb *FileWithBytes) GetName() string {
 	return fb.Name
 }
 
+func (fb *FileWithBytes) GetKind() string {
+	return "bytes"
+}
+
 type FileWithUrl struct {
 	FileBase
 	Url string `json:"url,omitempty"`
@@ -127,6 +142,10 @@ func (fu *FileWithUrl) GetMimeType() string {
 
 func (fu *FileWithUrl) GetName() string {
 	return fu.Name
+}
+
+func (fu *FileWithUrl) GetKind() string {
+	return "url"
 }
 
 type TextPart struct {

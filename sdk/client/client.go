@@ -25,13 +25,16 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/yeeaiclub/a2a-go/internal/logger"
+	"github.com/yeeaiclub/a2a-go/sdk/client/middleware"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
+	"github.com/yeeaiclub/a2a-go/sdk/web"
 )
 
 type A2AClient struct {
-	card  *types.AgentCard
-	clint *http.Client
-	url   string
+	card        *types.AgentCard
+	clint       *http.Client
+	url         string
+	middlewares []web.MiddlewareFunc
 }
 
 type A2AClientOption interface {
@@ -155,6 +158,12 @@ func (c *A2AClient) SendMessageStream(param types.MessageSendParam, eventChan ch
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "text/event-stream")
 
+	ctx := c.createCallContext(httpReq)
+
+	if err := c.apply(ctx); err != nil {
+		return fmt.Errorf("middleware error: %w", err)
+	}
+
 	httpResp, err := c.clint.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
@@ -193,6 +202,12 @@ func (c *A2AClient) ResubscribeToTask(params types.TaskIdParams, eventChan chan 
 	httpReq.Header.Set("Content-Type", "application/json")
 	httpReq.Header.Set("Accept", "text/event-stream")
 
+	ctx := c.createCallContext(httpReq)
+
+	if err := c.apply(ctx); err != nil {
+		return fmt.Errorf("middleware error: %w", err)
+	}
+
 	httpResp, err := c.clint.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
@@ -219,6 +234,12 @@ func (c *A2AClient) sendRequest(request any, resp *types.JSONRPCResponse) error 
 	httpReq, err := http.NewRequest(http.MethodPost, c.url, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
+	}
+
+	ctx := c.createCallContext(httpReq)
+
+	if err := c.apply(ctx); err != nil {
+		return fmt.Errorf("middleware error: %w", err)
 	}
 
 	httpResp, err := c.clint.Do(httpReq)
@@ -268,4 +289,34 @@ func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan
 		return fmt.Errorf("scanner error: %w", err)
 	}
 	return nil
+}
+
+func (c *A2AClient) Use(middleware ...web.MiddlewareFunc) {
+	c.middlewares = append(c.middlewares, middleware...)
+}
+
+func (c *A2AClient) apply(ctx web.Context) error {
+	if len(c.middlewares) == 0 {
+		return nil
+	}
+
+	finalHandler := func(ctx web.Context) error {
+		return nil
+	}
+
+	handler := finalHandler
+	for i := len(c.middlewares) - 1; i >= 0; i-- {
+		handler = c.middlewares[i](handler)
+	}
+
+	return handler(ctx)
+}
+
+func (c *A2AClient) createCallContext(req *http.Request) *middleware.CallContext {
+	ctx := &middleware.CallContext{}
+	ctx.SetRequest(req)
+	if c.card != nil {
+		ctx.SetSecurityConfig(c.card.Security, c.card.SecuritySchemes)
+	}
+	return ctx
 }
