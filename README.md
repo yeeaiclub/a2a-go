@@ -44,8 +44,7 @@ go get github.com/yeeaiclub/a2a-go
 
 ## Quick Start
 
-<details>
-<summary>Click to expand Go example</summary>
+
 
 ```go
 package main
@@ -96,7 +95,7 @@ func main() {
 	log.Printf("Task ID: %s, Status: %s", task.Id, task.Status.State)
 }
 ```
-</details>
+
 
 ## Use Cases
 
