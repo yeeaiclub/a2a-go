@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package middleware
 
 import (
 	"strings"
@@ -20,6 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yeeaiclub/a2a-go/sdk/web"
 )
 
 func TestNewInMemoryContextCredentials(t *testing.T) {
@@ -33,7 +34,7 @@ func TestGetCredentials(t *testing.T) {
 	tests := []struct {
 		name               string
 		setupCredentials   map[string]string // "sessionId" -> id schemeName -> token
-		context            *CallContext
+		context            web.Context
 		securitySchemeName string
 		expectedToken      string
 		expectedError      string
@@ -59,19 +60,19 @@ func TestGetCredentials(t *testing.T) {
 			setupCredentials: map[string]string{"session1:scheme1": "token1"},
 			context: func() *CallContext {
 				ctx := NewCallContext(1)
-				ctx.State["sessionId"] = 123
+				ctx.state["sessionId"] = 123
 				return ctx
 			}(),
 			securitySchemeName: "scheme1",
 			expectedToken:      "",
-			expectedError:      "type asset failed",
+			expectedError:      "sessionId type assert failed: got int, want string",
 		},
 		{
 			name:             "credentials not found",
 			setupCredentials: map[string]string{"session1:scheme1": "token1"},
 			context: func() *CallContext {
 				ctx := NewCallContext(1)
-				ctx.State["sessionId"] = "session1"
+				ctx.state["sessionId"] = "session1"
 				return ctx
 			}(),
 			securitySchemeName: "scheme2",
@@ -83,7 +84,7 @@ func TestGetCredentials(t *testing.T) {
 			setupCredentials: map[string]string{"session1:scheme1": "token1"},
 			context: func() *CallContext {
 				ctx := NewCallContext(1)
-				ctx.State["sessionId"] = "session1"
+				ctx.state["sessionId"] = "session1"
 				return ctx
 			}(),
 			securitySchemeName: "scheme1",
@@ -99,7 +100,7 @@ func TestGetCredentials(t *testing.T) {
 			},
 			context: func() *CallContext {
 				ctx := NewCallContext(1)
-				ctx.State["sessionId"] = "session1"
+				ctx.state["sessionId"] = "session1"
 				return ctx
 			}(),
 			securitySchemeName: "scheme2",
@@ -207,7 +208,7 @@ func TestSetCredentials(t *testing.T) {
 			if len(tt.credentials) > 0 {
 				lastCred := tt.credentials[len(tt.credentials)-1]
 				context := NewCallContext(1)
-				context.State["sessionId"] = lastCred.sessionId
+				context.state["sessionId"] = lastCred.sessionId
 
 				result, err := cred.GetCredentials(lastCred.securitySchemeName, context)
 				require.NoError(t, err)
@@ -252,7 +253,7 @@ func TestUpdateCredentials(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cred := NewInMemoryContextCredentials()
 			context := NewCallContext(1)
-			context.State["sessionId"] = tt.sessionId
+			context.state["sessionId"] = tt.sessionId
 
 			cred.SetCredentials(tt.sessionId, tt.schemeName, tt.initialToken)
 

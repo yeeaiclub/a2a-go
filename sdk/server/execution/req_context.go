@@ -25,7 +25,7 @@ type RequestContext struct {
 	ContextId   string
 	Params      types.MessageSendParam
 	Task        *types.Task
-	CallContext server.ServerCallContext
+	CallContext server.CallContext
 }
 
 func NewRequestContext(options ...RequestContextOption) *RequestContext {
@@ -74,7 +74,7 @@ func WithTask(task *types.Task) RequestContextOption {
 	})
 }
 
-func WithServerContext(callContext server.ServerCallContext) RequestContextOption {
+func WithServerContext(callContext server.CallContext) RequestContextOption {
 	return RequestContextOptionFunc(func(ctx *RequestContext) {
 		ctx.CallContext = callContext
 	})

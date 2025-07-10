@@ -14,9 +14,42 @@
 
 package server
 
-import "github.com/yeeaiclub/a2a-go/sdk/auth"
+import (
+	"net/http"
 
-type ServerCallContext struct {
+	"github.com/yeeaiclub/a2a-go/sdk/auth"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
+)
+
+type CallContext struct {
 	User     auth.User
 	Metadata map[string]any
+}
+
+func (s CallContext) SetRequest(req *http.Request) {
+	panic("implement me")
+}
+
+func (s CallContext) Request() *http.Request {
+	panic("implement me")
+}
+
+func (s CallContext) Set(key string, value any) {
+	panic("implement me")
+}
+
+func (s CallContext) Get(key string) any {
+	panic("implement me")
+}
+
+func (s CallContext) GetSecurityRequirement() types.SecurityRequirement {
+	panic("implement me")
+}
+
+func (s CallContext) GetSecuritySchemes(key string) types.SecurityScheme {
+	panic("implement me")
+}
+
+func (s CallContext) SetSecurityConfig(security types.SecurityRequirement, schemes map[string]types.SecurityScheme) {
+	panic("implement me")
 }

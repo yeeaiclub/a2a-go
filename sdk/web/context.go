@@ -12,13 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package web
 
-// CallContext a context passed with each client call
-type CallContext struct {
-	State map[string]any
+import (
+	"net/http"
+
+	"github.com/yeeaiclub/a2a-go/sdk/types"
+)
+
+type Context interface {
+	SetRequest(req *http.Request)
+	Request() *http.Request
+	Set(key string, value any)
+	Get(key string) any
+	GetSecurityRequirement() types.SecurityRequirement
+	GetSecuritySchemes(key string) types.SecurityScheme
+	SetSecurityConfig(security types.SecurityRequirement, schemes map[string]types.SecurityScheme)
 }
 
-func NewCallContext(size uint) *CallContext {
-	return &CallContext{State: make(map[string]any, size)}
-}
+type (
+	MiddlewareFunc func(next HandlerFunc) HandlerFunc
+	HandlerFunc    func(ctx Context) error
+)
