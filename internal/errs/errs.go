@@ -17,8 +17,6 @@ package errs
 import "errors"
 
 var (
-	ErrQueueEmpty           = errors.New("queue is empty")
-	ErrQueueClosed          = errors.New("queue is closed")
 	ErrUnsupportedOperation = errors.New("this operation is not supported")
 	ErrTaskNotFound         = errors.New("task not found")
 	ErrInValidResponse      = errors.New("agent did not return valid response for cancel")

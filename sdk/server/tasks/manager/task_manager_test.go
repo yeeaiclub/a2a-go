@@ -16,162 +16,247 @@ package manager
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yeeaiclub/a2a-go/internal/mocks/tasks"
+	mocktasks "github.com/yeeaiclub/a2a-go/internal/mocks/tasks"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 	"go.uber.org/mock/gomock"
 )
 
 func TestGetTask(t *testing.T) {
-	testcases := []struct {
+	testCases := []struct {
 		name        string
-		before      func(store *tasks.MockTaskStore)
+		setup       func(store *mocktasks.MockTaskStore)
 		taskId      string
 		contextId   string
 		initMessage types.Message
 		want        *types.Task
+		expectErr   bool
 	}{
 		{
-			name:        "get task",
+			name:        "get task success",
 			taskId:      "1",
 			contextId:   "2",
 			initMessage: types.Message{Role: "user", TaskID: "1"},
-			before: func(store *tasks.MockTaskStore) {
+			setup: func(store *mocktasks.MockTaskStore) {
 				store.EXPECT().Get(gomock.Any(), "1").Return(&types.Task{Id: "1"}, nil)
 			},
 			want: &types.Task{Id: "1"},
 		},
+		{
+			name:      "get task not found",
+			taskId:    "not-exist",
+			contextId: "2",
+			setup: func(store *mocktasks.MockTaskStore) {
+				store.EXPECT().Get(gomock.Any(), "not-exist").Return(nil, nil)
+			},
+			want: nil,
+		},
+		{
+			name:      "get task error",
+			taskId:    "err-id",
+			contextId: "2",
+			setup: func(store *mocktasks.MockTaskStore) {
+				store.EXPECT().Get(gomock.Any(), "err-id").Return(nil, errors.New("db error"))
+			},
+			want:      nil,
+			expectErr: true,
+		},
+		{
+			name:      "empty taskId should error",
+			taskId:    "",
+			contextId: "2",
+			setup:     func(store *mocktasks.MockTaskStore) {},
+			want:      nil,
+			expectErr: true,
+		},
 	}
-	for _, tc := range testcases {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			store := tasks.NewMockTaskStore(ctrl)
-			tc.before(store)
+			store := mocktasks.NewMockTaskStore(ctrl)
+			tc.setup(store)
 
-			manger := NewTaskManger(
+			manager := NewTaskManger(
 				store,
 				WithTaskId(tc.taskId),
 				WithContextId(tc.contextId),
-				WithInitMessage(&tc.initMessage))
+				WithInitMessage(&tc.initMessage),
+			)
 
-			task, err := manger.GetTask(context.Background())
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, task)
+			task, err := manager.GetTask(context.Background())
+			if tc.expectErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, task)
+			}
 		})
 	}
 }
 
-func TestSaveTask(t *testing.T) {
-	testcases := []struct {
+func TestTaskManager_saveTask(t *testing.T) {
+	testCases := []struct {
 		name      string
 		taskId    string
 		contextId string
 		task      *types.Task
-		before    func(store *tasks.MockTaskStore)
-		after     func(manager *TaskManager)
+		setup     func(store *mocktasks.MockTaskStore)
+		check     func(manager *TaskManager)
+		wantErr   bool
 	}{
 		{
-			name:      "save task",
+			name:      "save task success",
 			taskId:    "1",
 			contextId: "2",
 			task:      &types.Task{Id: "1", ContextId: "2"},
-			before: func(store *tasks.MockTaskStore) {
-				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1", ContextId: "2"})
+			setup: func(store *mocktasks.MockTaskStore) {
+				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1", ContextId: "2"}).Return(nil)
 			},
-			after: func(manager *TaskManager) {
+			check: func(manager *TaskManager) {
 				assert.Equal(t, "1", manager.taskId)
 				assert.Equal(t, "2", manager.contextId)
 			},
 		},
 		{
-			name: "create manger without id and save",
-			task: &types.Task{Id: "1", ContextId: "2"},
-			before: func(store *tasks.MockTaskStore) {
-				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1", ContextId: "2"})
+			name:   "save task error",
+			taskId: "1",
+			task:   &types.Task{Id: "1"},
+			setup: func(store *mocktasks.MockTaskStore) {
+				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1"}).Return(errors.New("save error"))
 			},
-			after: func(manager *TaskManager) {
+			check:   func(manager *TaskManager) {},
+			wantErr: true,
+		},
+		{
+			name: "create manager without id and save",
+			task: &types.Task{Id: "1", ContextId: "2"},
+			setup: func(store *mocktasks.MockTaskStore) {
+				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1", ContextId: "2"}).Return(nil)
+			},
+			check: func(manager *TaskManager) {
 				assert.Equal(t, "1", manager.taskId)
 				assert.Equal(t, "2", manager.contextId)
 			},
 		},
 	}
-
-	for _, tc := range testcases {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-
-			store := tasks.NewMockTaskStore(ctrl)
-			tc.before(store)
-			manager := NewTaskManger(store,
-				WithTaskId(tc.taskId),
-				WithContextId(tc.contextId))
+			store := mocktasks.NewMockTaskStore(ctrl)
+			tc.setup(store)
+			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
 			err := manager.saveTask(context.Background(), tc.task)
-			require.NoError(t, err)
-			tc.after(manager)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				if tc.check != nil {
+					tc.check(manager)
+				}
+			}
 		})
 	}
 }
 
-func TestEnsureTask(t *testing.T) {
-	testcases := []struct {
+func TestTaskManager_EnsureTask(t *testing.T) {
+	testCases := []struct {
 		name        string
 		taskId      string
 		contextId   string
 		initMessage types.Message
 		event       types.Event
 		want        *types.Task
-		before      func(store *tasks.MockTaskStore)
+		setup       func(store *mocktasks.MockTaskStore)
+		wantErr     bool
 	}{
 		{
-			name:      "get task",
+			name:      "get task from store",
 			taskId:    "1",
 			contextId: "2",
 			event:     &types.TaskStatusUpdateEvent{TaskId: "1"},
 			want:      &types.Task{Id: "1"},
-			before: func(store *tasks.MockTaskStore) {
+			setup: func(store *mocktasks.MockTaskStore) {
 				store.EXPECT().Get(gomock.Any(), "1").Return(&types.Task{Id: "1"}, nil)
 			},
 		},
 		{
-			name:      "init task and save",
-			taskId:    "1",
-			contextId: "1",
-			event:     &types.TaskStatusUpdateEvent{TaskId: "1"},
-			want: &types.Task{Id: "1", Status: types.TaskStatus{
-				State: types.SUBMITTED,
-			}},
-			before: func(store *tasks.MockTaskStore) {
+			name:        "init new task and save",
+			taskId:      "1",
+			contextId:   "1",
+			initMessage: types.Message{Role: types.User, TaskID: "1", ContextID: "1", Kind: "init", MessageID: "msg-1"},
+			event:       &types.TaskStatusUpdateEvent{TaskId: "1"},
+			want: &types.Task{
+				Id: "1",
+				Status: types.TaskStatus{
+					State: types.SUBMITTED,
+				},
+				History: []*types.Message{
+					{Role: types.User, TaskID: "1", ContextID: "1", Kind: "init", MessageID: "msg-1"},
+				},
+			},
+			setup: func(store *mocktasks.MockTaskStore) {
 				store.EXPECT().Get(gomock.Any(), "1").Return(nil, nil)
-				store.EXPECT().Save(gomock.Any(), &types.Task{
-					Id:     "1",
-					Status: types.TaskStatus{State: types.SUBMITTED},
-				}).Return(nil)
+				store.EXPECT().Save(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(_ context.Context, task *types.Task) error {
+						require.Equal(t, "1", task.Id)
+						require.Equal(t, types.SUBMITTED, task.Status.State)
+						return nil
+					},
+				)
 			},
 		},
+		{
+			name:      "get task error",
+			taskId:    "1",
+			contextId: "2",
+			event:     &types.TaskStatusUpdateEvent{TaskId: "1"},
+			setup: func(store *mocktasks.MockTaskStore) {
+				store.EXPECT().Get(gomock.Any(), "1").Return(nil, errors.New("db error"))
+			},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:      "save new task error",
+			taskId:    "1",
+			contextId: "2",
+			event:     &types.TaskStatusUpdateEvent{TaskId: "1"},
+			setup: func(store *mocktasks.MockTaskStore) {
+				store.EXPECT().Get(gomock.Any(), "1").Return(nil, nil)
+				store.EXPECT().Save(gomock.Any(), gomock.Any()).Return(errors.New("save error"))
+			},
+			want:    nil,
+			wantErr: true,
+		},
 	}
-
-	for _, tc := range testcases {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			store := tasks.NewMockTaskStore(ctrl)
-			tc.before(store)
-
-			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
+			store := mocktasks.NewMockTaskStore(ctrl)
+			if tc.setup != nil {
+				tc.setup(store)
+			}
+			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId), WithInitMessage(&tc.initMessage))
 			task, err := manager.EnsureTask(context.Background(), tc.event)
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, task)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, task)
+			}
 		})
 	}
 }
 
-func TestUpdateWithMessage(t *testing.T) {
-	testcase := []struct {
+func TestTaskManager_UpdateWithMessage(t *testing.T) {
+	testCases := []struct {
 		name      string
 		taskId    string
 		contextId string
@@ -179,57 +264,82 @@ func TestUpdateWithMessage(t *testing.T) {
 		task      types.Task
 	}{
 		{
-			name:      "update with message",
+			name:      "update with message and status message",
 			taskId:    "1",
 			contextId: "1",
 			message:   types.Message{Role: types.User},
 			task:      types.Task{Id: "1", Status: types.TaskStatus{Message: &types.Message{Role: types.Agent}}},
 		},
+		{
+			name:      "update with message only",
+			taskId:    "2",
+			contextId: "2",
+			message:   types.Message{Role: types.User},
+			task:      types.Task{Id: "2"},
+		},
 	}
-
-	for _, tc := range testcase {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			store := tasks.NewMockTaskStore(ctrl)
+			store := mocktasks.NewMockTaskStore(ctrl)
 			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
-			manager.UpdateWithMessage(&tc.message, &tc.task)
-			assert.ElementsMatch(t, tc.task.History, []*types.Message{{Role: types.User}, {Role: types.Agent}})
+			result := manager.UpdateWithMessage(&tc.message, &tc.task)
+			if tc.task.Status.Message != nil {
+				assert.ElementsMatch(t, result.History, []*types.Message{tc.task.Status.Message, &tc.message})
+			} else {
+				assert.ElementsMatch(t, result.History, []*types.Message{&tc.message})
+			}
 		})
 	}
 }
 
-func TestSaveStream(t *testing.T) {
-	testcases := []struct {
+func TestSaveTaskEvent(t *testing.T) {
+	testCases := []struct {
 		name      string
 		taskId    string
 		contextId string
 		event     types.Event
-		before    func(store *tasks.MockTaskStore)
+		setup     func(store *mocktasks.MockTaskStore)
 		want      *types.Task
+		wantErr   bool
 	}{
 		{
-			name:      "save task",
+			name:      "save task event with task",
 			taskId:    "1",
 			contextId: "2",
 			event:     &types.Task{Id: "1"},
-			before: func(store *tasks.MockTaskStore) {
+			setup: func(store *mocktasks.MockTaskStore) {
 				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1"}).Return(nil)
 			},
 			want: &types.Task{Id: "1"},
 		},
+		{
+			name:      "save task event with mismatched id",
+			taskId:    "1",
+			contextId: "2",
+			event:     &types.Task{Id: "2"},
+			setup:     func(store *mocktasks.MockTaskStore) {},
+			want:      nil,
+			wantErr:   true,
+		},
 	}
-
-	for _, tc := range testcases {
+	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
-			store := tasks.NewMockTaskStore(ctrl)
-			tc.before(store)
-			manger := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
-			event, err := manger.SaveTaskEvent(context.Background(), tc.event)
-			require.NoError(t, err)
-			assert.Equal(t, tc.want, event)
+			store := mocktasks.NewMockTaskStore(ctrl)
+			if tc.setup != nil {
+				tc.setup(store)
+			}
+			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
+			result, err := manager.SaveTaskEvent(context.Background(), tc.event)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.want, result)
+			}
 		})
 	}
 }
