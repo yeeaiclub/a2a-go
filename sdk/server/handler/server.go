@@ -31,16 +31,18 @@ const (
 	defaultIdleTimeout  = 30 * time.Second
 )
 
+// Server implements the main HTTP server for agent APIs, including JSON-RPC and streaming endpoints.
 type Server struct {
-	agentCardPath string
-	card          types.AgentCard
-	handler       Handler
-	basePath      string
-	readTimeout   time.Duration
-	writeTimeout  time.Duration
-	idleTimeout   time.Duration
+	agentCardPath string          // Path for agent card metadata
+	card          types.AgentCard // Agent card metadata
+	handler       Handler         // Business logic handler
+	basePath      string          // Base path for API
+	readTimeout   time.Duration   // HTTP read timeout
+	writeTimeout  time.Duration   // HTTP write timeout
+	idleTimeout   time.Duration   // HTTP idle timeout
 }
 
+// NewServer creates a new Server with the given configuration and options.
 func NewServer(cardPath string, basePath string, card types.AgentCard, handler Handler, options ...ServerConfigOption) *Server {
 	server := &Server{
 		basePath:      basePath,
@@ -57,6 +59,7 @@ func NewServer(cardPath string, basePath string, card types.AgentCard, handler H
 	return server
 }
 
+// Start launches the HTTP server on the specified port.
 func (s *Server) Start(port int) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.agentCardPath, s.handleGetAgentCard)
@@ -73,6 +76,7 @@ func (s *Server) Start(port int) error {
 	return server.ListenAndServe()
 }
 
+// handleGetAgentCard handles GET requests for the agent card metadata.
 func (s *Server) handleGetAgentCard(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -86,6 +90,7 @@ func (s *Server) handleGetAgentCard(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ServeHTTP is the main entry for JSON-RPC POST requests, dispatching to the appropriate handler.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -113,10 +118,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case types.MethodTasksResubscribe:
 		s.handleResubscribeToTask(r.Context(), w, &request, request.Id)
 	default:
+		log.Warnf("Unknown method: %s", request.Method)
 	}
 }
 
+// handleMessageSend handles the message/send JSON-RPC method.
 func (s *Server) handleMessageSend(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+	log.Infof("handleMessageSend called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.MessageSendParam](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -131,7 +139,9 @@ func (s *Server) handleMessageSend(ctx context.Context, w http.ResponseWriter, r
 	s.sendResponse(w, id, event)
 }
 
+// handleMessageSendStream handles the message/stream JSON-RPC method with server-sent events (SSE).
 func (s *Server) handleMessageSendStream(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+	log.Infof("handleMessageSendStream called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.MessageSendParam](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -158,25 +168,31 @@ func (s *Server) handleMessageSendStream(ctx context.Context, w http.ResponseWri
 			return
 		case ev, o := <-events:
 			if !o {
-				if ev.Err != nil || ev.Event != nil {
-					_ = ev.EncodeJSONRPC(encoder, id)
-				}
 				return
 			}
-			if ev.Err != nil {
+			switch ev.Type {
+			case types.EventData:
 				_ = ev.EncodeJSONRPC(encoder, id)
+				flusher.Flush()
+			case types.EventError:
+				_ = ev.EncodeJSONRPC(encoder, id)
+				flusher.Flush()
 				return
-			}
-			err = ev.EncodeJSONRPC(encoder, id)
-			if err != nil {
+			case types.EventDone:
+				_ = ev.EncodeJSONRPC(encoder, id)
+				flusher.Flush()
 				return
+			case types.EventClosed:
+				return
+			default:
 			}
-			flusher.Flush()
 		}
 	}
 }
 
+// handleGetTask handles the tasks/get JSON-RPC method.
 func (s *Server) handleGetTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+	log.Infof("handleGetTask called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskQueryParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -191,7 +207,9 @@ func (s *Server) handleGetTask(ctx context.Context, w http.ResponseWriter, reque
 	s.sendResponse(w, id, event)
 }
 
+// handleCancelTask handles the tasks/cancel JSON-RPC method.
 func (s *Server) handleCancelTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+	log.Infof("handleCancelTask called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -206,7 +224,9 @@ func (s *Server) handleCancelTask(ctx context.Context, w http.ResponseWriter, re
 	s.sendResponse(w, id, event)
 }
 
+// handleSetTaskPushNotificationConfig handles the tasks/pushNotificationConfig/set JSON-RPC method.
 func (s *Server) handleSetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+	log.Infof("handleSetTaskPushNotificationConfig called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskPushNotificationConfig](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -221,7 +241,9 @@ func (s *Server) handleSetTaskPushNotificationConfig(ctx context.Context, w http
 	s.sendResponse(w, id, event)
 }
 
+// handleGetTaskPushNotificationConfig handles the tasks/pushNotificationConfig/get JSON-RPC method.
 func (s *Server) handleGetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+	log.Infof("handleGetTaskPushNotificationConfig called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
@@ -237,7 +259,9 @@ func (s *Server) handleGetTaskPushNotificationConfig(ctx context.Context, w http
 	s.sendResponse(w, id, event)
 }
 
+// handleResubscribeToTask handles the tasks/resubscribe JSON-RPC method with SSE.
 func (s *Server) handleResubscribeToTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+	log.Infof("handleResubscribeToTask called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.InternalError())
@@ -264,27 +288,29 @@ func (s *Server) handleResubscribeToTask(ctx context.Context, w http.ResponseWri
 			return
 		case ev, o := <-events:
 			if !o {
-				if ev.Err != nil || ev.Event != nil {
-					_ = ev.EncodeJSONRPC(encoder, id)
-				}
 				return
 			}
-			if ev.Err != nil {
+			switch ev.Type {
+			case types.EventData:
 				_ = ev.EncodeJSONRPC(encoder, id)
+				flusher.Flush()
+			case types.EventError:
+				_ = ev.EncodeJSONRPC(encoder, id)
+				flusher.Flush()
 				return
-			}
-			err = ev.EncodeJSONRPC(encoder, id)
-			if err != nil {
+			case types.EventDone:
+				_ = ev.EncodeJSONRPC(encoder, id)
+				flusher.Flush()
 				return
-			}
-			flusher.Flush()
-			if ev.Type == types.EventDone {
+			case types.EventClosed:
 				return
+			default:
 			}
 		}
 	}
 }
 
+// sendError writes a JSON-RPC error response.
 func (s *Server) sendError(w http.ResponseWriter, id string, err *types.JSONRPCError) {
 	response := types.JSONRPCResponse{
 		Id:      id,
@@ -295,6 +321,7 @@ func (s *Server) sendError(w http.ResponseWriter, id string, err *types.JSONRPCE
 	_ = json.NewEncoder(w).Encode(response)
 }
 
+// sendResponse writes a JSON-RPC success response.
 func (s *Server) sendResponse(w http.ResponseWriter, id string, result any) {
 	response := types.JSONRPCResponse{
 		Id:      id,
@@ -305,28 +332,33 @@ func (s *Server) sendResponse(w http.ResponseWriter, id string, result any) {
 	_ = json.NewEncoder(w).Encode(response)
 }
 
+// ServerConfigOption allows customizing the Server via functional options.
 type ServerConfigOption interface {
 	Option(server *Server)
 }
 
+// ServerConfigOptionFunc is a function type for ServerConfigOption.
 type ServerConfigOptionFunc func(server *Server)
 
 func (fn ServerConfigOptionFunc) Option(server *Server) {
 	fn(server)
 }
 
+// WithReadTimeout sets the server's read timeout.
 func WithReadTimeout(readTimeout time.Duration) ServerConfigOption {
 	return ServerConfigOptionFunc(func(server *Server) {
 		server.readTimeout = readTimeout
 	})
 }
 
+// WithWriteTimeout sets the server's write timeout.
 func WithWriteTimeout(writeTimeout time.Duration) ServerConfigOption {
 	return ServerConfigOptionFunc(func(server *Server) {
 		server.writeTimeout = writeTimeout
 	})
 }
 
+// WithIdleTimeout sets the server's idle timeout.
 func WithIdleTimeout(idleTimeout time.Duration) ServerConfigOption {
 	return ServerConfigOptionFunc(func(server *Server) {
 		server.idleTimeout = idleTimeout

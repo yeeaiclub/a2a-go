@@ -17,15 +17,15 @@ package types
 type TaskState string
 
 const (
-	SUBMITTED     = "submitted"
-	WORKING       = "working"
-	InputRequired = "required"
-	COMPLETED     = "completed"
-	CANCELED      = "canceled"
-	FAILED        = "failed"
-	REJECTED      = "rejected"
-	AUTH_REQUIRED = "auth_required"
-	UNKNOWN       = "unknown"
+	SUBMITTED     TaskState = "submitted"
+	WORKING       TaskState = "working"
+	InputRequired TaskState = "required"
+	COMPLETED     TaskState = "completed"
+	CANCELED      TaskState = "canceled"
+	FAILED        TaskState = "failed"
+	REJECTED      TaskState = "rejected"
+	AUTH_REQUIRED TaskState = "auth_required"
+	UNKNOWN       TaskState = "unknown"
 )
 
 type TaskStatus struct {

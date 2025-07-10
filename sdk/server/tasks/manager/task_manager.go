@@ -24,15 +24,16 @@ import (
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
-// TaskManager helps mange a task's lifecycle during execution of a request
+// TaskManager manages the lifecycle and state of a task during request execution.
 type TaskManager struct {
-	taskId      string
-	contextId   string
-	store       tasks.TaskStore
-	initMessage *types.Message
-	currentTask *types.Task
+	taskId      string          // Task ID
+	contextId   string          // Context ID
+	store       tasks.TaskStore // Task storage backend
+	initMessage *types.Message  // Initial message for the task
+	currentTask *types.Task     // Cached current task
 }
 
+// TaskManagerOption is an option for configuring TaskManager.
 type TaskManagerOption interface {
 	Option(manager *TaskManager)
 }
@@ -43,24 +44,28 @@ func (fn TaskManagerOptionFunc) Option(manger *TaskManager) {
 	fn(manger)
 }
 
+// WithTaskId sets the task ID for the TaskManager.
 func WithTaskId(taskId string) TaskManagerOption {
 	return TaskManagerOptionFunc(func(manger *TaskManager) {
 		manger.taskId = taskId
 	})
 }
 
+// WithContextId sets the context ID for the TaskManager.
 func WithContextId(contextId string) TaskManagerOption {
 	return TaskManagerOptionFunc(func(manger *TaskManager) {
 		manger.contextId = contextId
 	})
 }
 
+// WithInitMessage sets the initial message for the TaskManager.
 func WithInitMessage(message *types.Message) TaskManagerOption {
 	return TaskManagerOptionFunc(func(manger *TaskManager) {
 		manger.initMessage = message
 	})
 }
 
+// NewTaskManger creates a new TaskManager with the given store and options.
 func NewTaskManger(store tasks.TaskStore, opts ...TaskManagerOption) *TaskManager {
 	manger := &TaskManager{store: store}
 
@@ -70,7 +75,7 @@ func NewTaskManger(store tasks.TaskStore, opts ...TaskManagerOption) *TaskManage
 	return manger
 }
 
-// GetTask retrieves the current task object, either from memory or the store
+// GetTask retrieves the current task, either from memory or from the store.
 func (t *TaskManager) GetTask(ctx context.Context) (*types.Task, error) {
 	if t.taskId == "" {
 		return nil, errs.ErrTaskIdNotSet
@@ -88,7 +93,7 @@ func (t *TaskManager) GetTask(ctx context.Context) (*types.Task, error) {
 	return task, nil
 }
 
-// SaveTaskEvent Process a tasked-related event
+// SaveTaskEvent processes a task-related event and updates the task state.
 func (t *TaskManager) SaveTaskEvent(ctx context.Context, event types.Event) (*types.Task, error) {
 	taskId := event.GetTaskId()
 
@@ -110,6 +115,7 @@ func (t *TaskManager) SaveTaskEvent(ctx context.Context, event types.Event) (*ty
 	return t.handleEvent(ctx, event)
 }
 
+// handleTaskEvent handles a direct task event and saves it to the store.
 func (t *TaskManager) handleTaskEvent(ctx context.Context, event types.Event) (*types.Task, error) {
 	task, ok := event.(*types.Task)
 	if !ok {
@@ -121,6 +127,7 @@ func (t *TaskManager) handleTaskEvent(ctx context.Context, event types.Event) (*
 	return task, nil
 }
 
+// handleEvent handles a non-task event and updates the task accordingly.
 func (t *TaskManager) handleEvent(ctx context.Context, event types.Event) (*types.Task, error) {
 	task, err := t.EnsureTask(ctx, event)
 	if err != nil {
@@ -139,7 +146,7 @@ func (t *TaskManager) handleEvent(ctx context.Context, event types.Event) (*type
 	return task, nil
 }
 
-// UpdateWithMessage updates a task object in memory by adding a new initMessage
+// UpdateWithMessage updates a task in memory by adding a new message to its history.
 func (t *TaskManager) UpdateWithMessage(message *types.Message, task *types.Task) *types.Task {
 	if task.Status.Message != nil {
 		task.History = append(task.History, task.Status.Message)
@@ -150,6 +157,7 @@ func (t *TaskManager) UpdateWithMessage(message *types.Message, task *types.Task
 	return task
 }
 
+// Process processes a task event and returns the event or error.
 func (t *TaskManager) Process(ctx context.Context, event types.Event) (types.Event, error) {
 	_, err := t.SaveTaskEvent(ctx, event)
 	if err != nil {
@@ -158,6 +166,7 @@ func (t *TaskManager) Process(ctx context.Context, event types.Event) (types.Eve
 	return event, nil
 }
 
+// saveTask saves the task to the store and updates the cache and IDs.
 func (t *TaskManager) saveTask(ctx context.Context, task *types.Task) error {
 	err := t.store.Save(ctx, task)
 	if err != nil {
@@ -172,6 +181,7 @@ func (t *TaskManager) saveTask(ctx context.Context, task *types.Task) error {
 	return nil
 }
 
+// EnsureTask ensures a task exists for the given event, creating it if necessary.
 func (t *TaskManager) EnsureTask(ctx context.Context, event types.Event) (*types.Task, error) {
 	task := t.currentTask
 	if task == nil && t.taskId != "" {
@@ -192,6 +202,7 @@ func (t *TaskManager) EnsureTask(ctx context.Context, event types.Event) (*types
 	return task, nil
 }
 
+// initTask creates a new task with the given IDs and initial state.
 func (t *TaskManager) initTask(taskId string, contextId string) *types.Task {
 	task := &types.Task{
 		Id:        taskId,

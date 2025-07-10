@@ -28,29 +28,35 @@ import (
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
-// Handler a2a request handler interface
+// Handler defines the interface for handling all agent API requests.
 type Handler interface {
+	// OnGetTask retrieves a task by its ID.
 	OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error)
-	// OnMessageSend start the agent execution for the message and waits for the final result
+	// OnMessageSend starts the agent execution for the message and waits for the final result.
 	OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error)
-	// OnMessageSendStream start the agent execution and yields events
+	// OnMessageSendStream starts the agent execution and yields events as a stream.
 	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent
-	// OnCancelTask attempts to cancel the task manged by the agentExecutor
+	// OnCancelTask attempts to cancel the task managed by the agent executor.
 	OnCancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error)
+	// OnSetTaskPushNotificationConfig sets the push notification configuration for a task.
 	OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error)
+	// OnGetTaskPushNotificationConfig retrieves the push notification configuration for a task.
 	OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error)
+	// OnResubscribeToTask resubscribes to task events and returns a stream of events.
 	OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent
 }
 
+// DefaultHandler provides a default implementation of the Handler interface.
 type DefaultHandler struct {
-	manger           *manager.TaskManager
-	store            tasks.TaskStore
-	queueManger      event.QueueManager
-	executor         execution.AgentExecutor
-	resultAggregator *aggregator.ResultAggregator
-	pushNotifier     tasks.PushNotifier
+	manger           *manager.TaskManager         // Task manager for task lifecycle
+	store            tasks.TaskStore              // Task storage backend
+	queueManger      event.QueueManager           // Event queue manager
+	executor         execution.AgentExecutor      // Agent execution engine
+	resultAggregator *aggregator.ResultAggregator // Aggregates results from event queue
+	pushNotifier     tasks.PushNotifier           // Push notification handler
 }
 
+// NewDefaultHandler creates a new DefaultHandler with optional configuration.
 func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, opts ...HandlerOption) *DefaultHandler {
 	handler := &DefaultHandler{store: store, executor: executor}
 	for _, opt := range opts {
@@ -60,6 +66,7 @@ func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, 
 	return handler
 }
 
+// OnGetTask handles task retrieval requests.
 func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error) {
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
@@ -68,6 +75,7 @@ func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryPa
 	return task, nil
 }
 
+// OnMessageSend handles synchronous message send requests and waits for the result.
 func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error) {
 	taskManager := manager.NewTaskManger(
 		d.store,
@@ -126,6 +134,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 	return ev, nil
 }
 
+// OnMessageSendStream handles streaming message send requests, returning a channel of events.
 func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent {
 	errorStream := func(err error) <-chan types.StreamEvent {
 		ch := make(chan types.StreamEvent, 1)
@@ -167,7 +176,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 	return resultAggregator.ConsumeAndEmit(ctx, queue)
 }
 
-// OnCancelTask attempts to cancel the task manged by agentExecutor
+// OnCancelTask handles task cancellation requests.
 func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error) {
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
@@ -203,6 +212,7 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 	return nil, errs.ErrInValidResponse
 }
 
+// OnSetTaskPushNotificationConfig sets push notification configuration for a task.
 func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
 		return nil, errs.ErrUnsupportedOperation
@@ -216,6 +226,7 @@ func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, pa
 	return &params, nil
 }
 
+// OnGetTaskPushNotificationConfig retrieves push notification configuration for a task.
 func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
 		return nil, errs.ErrUnsupportedOperation
@@ -240,6 +251,7 @@ func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, pa
 	return &types.TaskPushNotificationConfig{TaskId: params.Id, Config: config}, nil
 }
 
+// OnResubscribeToTask handles resubscription to task events, returning a channel of events.
 func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent {
 	errorStream := func(err error) <-chan types.StreamEvent {
 		ch := make(chan types.StreamEvent, 1)
@@ -269,6 +281,7 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.T
 	return resultAggregator.ConsumeAndEmit(ctx, queue)
 }
 
+// execute runs the agent executor in a goroutine and closes the queue on completion.
 func (d *DefaultHandler) execute(ctx context.Context, reqCtx *execution.RequestContext, queue *event.Queue) {
 	go func() {
 		defer queue.Close()
@@ -279,6 +292,7 @@ func (d *DefaultHandler) execute(ctx context.Context, reqCtx *execution.RequestC
 	}()
 }
 
+// cancel requests cancellation of a running task.
 func (d *DefaultHandler) cancel(ctx context.Context, reqCtx *execution.RequestContext, queue *event.Queue) {
 	go func() {
 		err := d.executor.Cancel(ctx, reqCtx, queue)
@@ -288,12 +302,14 @@ func (d *DefaultHandler) cancel(ctx context.Context, reqCtx *execution.RequestCo
 	}()
 }
 
+// shouldAddPushInfo checks if push notification info should be added for the request.
 func (d *DefaultHandler) shouldAddPushInfo(params types.MessageSendParam) bool {
 	return d.pushNotifier != nil &&
 		params.Configuration != nil &&
 		params.Configuration.PushNotificationConfig != nil
 }
 
+// IsTerminalTaskSates returns true if the task state is terminal (completed, canceled, failed, rejected).
 func (d *DefaultHandler) IsTerminalTaskSates(state types.TaskState) bool {
 	return state == types.COMPLETED ||
 		state == types.CANCELED ||
@@ -301,34 +317,40 @@ func (d *DefaultHandler) IsTerminalTaskSates(state types.TaskState) bool {
 		state == types.REJECTED
 }
 
+// HandlerOption allows customizing DefaultHandler via functional options.
 type HandlerOption interface {
 	Option(d *DefaultHandler)
 }
 
+// HandlerOptionFunc is a function type for HandlerOption.
 type HandlerOptionFunc func(d *DefaultHandler)
 
 func (fn HandlerOptionFunc) Option(d *DefaultHandler) {
 	fn(d)
 }
 
+// WithTaskManger sets a custom TaskManager for the handler.
 func WithTaskManger(taskManger *manager.TaskManager) HandlerOption {
 	return HandlerOptionFunc(func(d *DefaultHandler) {
 		d.manger = taskManger
 	})
 }
 
+// WithQueueManger sets a custom QueueManager for the handler.
 func WithQueueManger(queueManger event.QueueManager) HandlerOption {
 	return HandlerOptionFunc(func(d *DefaultHandler) {
 		d.queueManger = queueManger
 	})
 }
 
+// WithResultAggregator sets a custom ResultAggregator for the handler.
 func WithResultAggregator(rg *aggregator.ResultAggregator) HandlerOption {
 	return HandlerOptionFunc(func(d *DefaultHandler) {
 		d.resultAggregator = rg
 	})
 }
 
+// WithPushNotifier sets a custom PushNotifier for the handler.
 func WithPushNotifier(pushNotifier tasks.PushNotifier) HandlerOption {
 	return HandlerOptionFunc(func(d *DefaultHandler) {
 		d.pushNotifier = pushNotifier
