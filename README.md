@@ -44,7 +44,34 @@ go get github.com/yeeaiclub/a2a-go
 
 ## Quick Start
 
+## agent Card
 
+Agent Cards define the capabilities and metadata of your AI agent.
+```go
+card := types.AgentCard{
+	Name:        "Weather Agent",
+	Description: "Helps with weather",
+	URL:         "http://localhost:10001",
+	Version:     "1.0.0",
+	Capabilities: &types.AgentCapabilities{
+		Streaming:              true,
+		StateTransitionHistory: false,
+    },
+	DefaultInputModes:  []string{"text"},
+	DefaultOutputModes: []string{"text"},
+	Skills: []types.AgentSkill{
+		{
+			Id:          "weather_search",
+			Name:        "Search weather",
+			Description: "Helps with weather in city, or states",
+			Tags:        []string{"weather"},
+			Examples:    []string{"weather in LA, CA"},
+        },
+    },
+}
+```
+
+## client
 
 ```go
 package main
@@ -93,6 +120,165 @@ func main() {
 		log.Fatalf("Failed to parse response: %v", err)
 	}
 	log.Printf("Task ID: %s, Status: %s", task.Id, task.Status.State)
+}
+```
+
+## executor
+
+```go
+import (
+	"context"
+	"fmt"
+
+	"github.com/yeeaiclub/a2a-go/sdk/server/event"
+	"github.com/yeeaiclub/a2a-go/sdk/server/execution"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks/updater"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
+)
+
+// WeatherAgentExecutorProducer implements the agent executor for weather agent
+type WeatherAgentExecutorProducer struct {
+	store        tasks.TaskStore
+	weatherAgent WeatherAgent
+}
+
+// WeatherAgent interface for weather service
+type WeatherAgent interface {
+	Chat(message string) (string, error)
+}
+
+// NewExecutor creates a new weather agent executor
+func NewExecutor(store tasks.TaskStore) *WeatherAgentExecutorProducer {
+	return &WeatherAgentExecutorProducer{
+		store:        store,
+		weatherAgent: nil, // your implement
+	}
+}
+
+// Execute implements the agent execution logic
+func (m *WeatherAgentExecutorProducer) Execute(ctx context.Context, requestContext *execution.RequestContext, queue *event.Queue) error {
+	u := updater.NewTaskUpdater(queue, requestContext.TaskId, requestContext.ContextId)
+
+	// mark the task as submitted and start working on it
+	if requestContext.Task == nil {
+		u.Submit()
+	}
+	u.StartWork()
+
+	// extract the text from the message
+	userMessage := m.extractTextFromMessage(requestContext.Params.Message)
+
+	// call the weather agent with the user's message
+	response, err := m.weatherAgent.Chat(userMessage)
+	if err != nil {
+		u.Failed()
+		return err
+	}
+
+	// create the response part
+	responsePart := &types.TextPart{
+		Kind: "text",
+		Text: response,
+	}
+	parts := []types.Part{responsePart}
+
+	// add the response as an artifact and complete the task
+	u.AddArtifact(parts)
+	u.Complete()
+
+	return nil
+}
+
+// Cancel implements the task cancellation logic
+func (m *WeatherAgentExecutorProducer) Cancel(ctx context.Context, requestContext *execution.RequestContext, queue *event.Queue) error {
+	task := requestContext.Task
+
+	if task == nil {
+		return fmt.Errorf("task not found")
+	}
+
+	if task.Status.State == types.CANCELED {
+		// task already cancelled
+		return fmt.Errorf("task already cancelled")
+	}
+
+	if task.Status.State == types.COMPLETED {
+		// task already completed
+		return fmt.Errorf("task already completed")
+	}
+
+	// cancel the task
+	u := updater.NewTaskUpdater(queue, requestContext.TaskId, requestContext.ContextId)
+	u.UpdateStatus(types.CANCELED, updater.WithFinal(true))
+
+	return nil
+}
+
+// extractTextFromMessage extracts text content from message parts
+func (m *WeatherAgentExecutorProducer) extractTextFromMessage(message *types.Message) string {
+	if message == nil || message.Parts == nil {
+		return ""
+	}
+
+	str := ""
+	for _, part := range message.Parts {
+		if textPart, ok := part.(*types.TextPart); ok {
+			str += textPart.Text
+		}
+	}
+	return str
+}
+```
+
+## server
+
+This section provides a simple example of how to start and run an a2a-go server locally. 
+
+Below is a basic example of starting the server:
+
+```go
+package main
+
+import (
+    "log"
+    
+	"github.com/yeeaiclub/a2a-go/sdk/server/handler"
+	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
+)
+
+func main() {
+	// Create in-memory task store for storing and managing task states
+	store := tasks.NewInMemoryTaskStore()
+	// Save an example task to the store (this is just for demonstration, may not be needed in actual use)
+	store.Save(context.Background(), &types.Task{Id: "1"})
+	
+    // TODO: Create your custom executor
+    // The executor is responsible for handling specific business logic, such as calling external APIs, processing data, etc.
+    executor = NewExecutor(store)
+	
+	// Create queue manager for handling asynchronous task queues
+	queue := NewQueueManager()
+	
+	// Create default handler, configuring task store, executor, and queue manager
+	defaultHandler := handler.NewDefaultHandler(mem, executor, handler.WithQueueManger(queue))
+
+	// Create server instance
+	// Parameter descriptions:
+	// - "/card": Agent card access path
+	// - "/api": API interface access path  
+	// - card: Agent card configuration
+	// - defaultHandler: Request handler
+	server := handler.NewServer("/card", "/api", card, defaultHandler)
+	
+	// Start the server
+	log.Println("Starting server on port 8080...")
+	log.Println("Agent card available at: http://localhost:8080/card")
+	log.Println("API available at: http://localhost:8080/api")
+	if err := server.Start(8080); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }
 ```
 
