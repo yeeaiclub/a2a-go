@@ -18,10 +18,21 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/yeeaiclub/a2a-go/sdk/auth"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
+
+// callContextPool is a pool for reusing CallContext objects
+var callContextPool = sync.Pool{
+	New: func() any {
+		return &CallContext{
+			state:           make(map[string]any),
+			securitySchemes: make(map[string]types.SecurityScheme),
+		}
+	},
+}
 
 // CallContext represents the context for a single API call
 // It contains user information, request data, security configuration, and metadata
@@ -36,8 +47,8 @@ type CallContext struct {
 	security        types.SecurityRequirement
 	securitySchemes map[string]types.SecurityScheme
 
-	// Metadata for storing arbitrary key-value pairs
-	Metadata map[string]any
+	// state for storing arbitrary key-value pairs
+	state map[string]any
 
 	// Mutex for thread-safe access to shared fields
 	mu sync.RWMutex
@@ -47,20 +58,28 @@ type CallContext struct {
 	cancel context.CancelFunc
 }
 
-// NewCallContext creates a new CallContext with default values
-func NewCallContext() *CallContext {
-	ctx, cancel := context.WithCancel(context.Background())
-	return &CallContext{
-		Metadata:        make(map[string]any),
-		securitySchemes: make(map[string]types.SecurityScheme),
-		ctx:             ctx,
-		cancel:          cancel,
+// NewCallContext creates a new CallContext with the given context
+// If no context is provided, it uses context.Background()
+func NewCallContext(ctx context.Context) *CallContext {
+	if ctx == nil {
+		ctx = context.Background()
 	}
+
+	// Get a context from the pool
+	callCtx := callContextPool.Get().(*CallContext)
+
+	// Create a new context with cancellation
+	cancelCtx, cancel := context.WithCancel(ctx)
+	callCtx.ctx = cancelCtx
+	callCtx.cancel = cancel
+
+	return callCtx
 }
 
 // NewCallContextWithRequest creates a new CallContext with an HTTP request
+// It uses the request's context as the base context for proper lifecycle management
 func NewCallContextWithRequest(req *http.Request) *CallContext {
-	callCtx := NewCallContext()
+	callCtx := NewCallContext(req.Context())
 	callCtx.SetRequest(req)
 	return callCtx
 }
@@ -97,20 +116,20 @@ func (c *CallContext) GetUser() auth.User {
 func (c *CallContext) Set(key string, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.Metadata == nil {
-		c.Metadata = make(map[string]any)
+	if c.state == nil {
+		c.state = make(map[string]any)
 	}
-	c.Metadata[key] = value
+	c.state[key] = value
 }
 
 // Get retrieves a value from the metadata
 func (c *CallContext) Get(key string) any {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if c.Metadata == nil {
+	if c.state == nil {
 		return nil
 	}
-	return c.Metadata[key]
+	return c.state[key]
 }
 
 // GetSecurityRequirement returns the security requirement for this context
@@ -162,6 +181,46 @@ func (c *CallContext) Done() <-chan struct{} {
 	return c.ctx.Done()
 }
 
+// Deadline returns the time when work done on behalf of this context
+// should be canceled, or ok==false if no deadline is set
+func (c *CallContext) Deadline() (deadline time.Time, ok bool) {
+	return c.ctx.Deadline()
+}
+
+// Err returns a non-nil error value after Done is closed
 func (c *CallContext) Err() error {
 	return c.ctx.Err()
+}
+
+// Value returns the value associated with this context for key, or nil
+// if no value is associated with key. This delegates to the underlying context.
+func (c *CallContext) Value(key any) any {
+	return c.ctx.Value(key)
+}
+
+// reset clears all fields and prepares the context for reuse
+func (c *CallContext) reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Cancel the current context if it exists
+	if c.cancel != nil {
+		c.cancel()
+	}
+
+	// Clear all fields
+	c.User = nil
+	c.request = nil
+	c.security = types.SecurityRequirement{}
+	c.securitySchemes = make(map[string]types.SecurityScheme)
+	c.state = make(map[string]any)
+	c.ctx = nil
+	c.cancel = nil
+}
+
+// Release returns the CallContext to the pool for reuse
+// This should be called when the context is no longer needed
+func (c *CallContext) Release() {
+	c.reset()
+	callContextPool.Put(c)
 }

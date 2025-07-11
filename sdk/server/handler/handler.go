@@ -20,6 +20,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yeeaiclub/a2a-go/internal/errs"
+	"github.com/yeeaiclub/a2a-go/sdk/server"
 	"github.com/yeeaiclub/a2a-go/sdk/server/event"
 	"github.com/yeeaiclub/a2a-go/sdk/server/execution"
 	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
@@ -31,19 +32,19 @@ import (
 // Handler defines the interface for handling all agent API requests.
 type Handler interface {
 	// OnGetTask retrieves a task by its ID.
-	OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error)
+	OnGetTask(ctx *server.CallContext, params types.TaskQueryParams) (*types.Task, error)
 	// OnMessageSend starts the agent execution for the message and waits for the final result.
-	OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error)
+	OnMessageSend(ctx *server.CallContext, params types.MessageSendParam) (types.Event, error)
 	// OnMessageSendStream starts the agent execution and yields events as a stream.
-	OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent
+	OnMessageSendStream(ctx *server.CallContext, params types.MessageSendParam) <-chan types.StreamEvent
 	// OnCancelTask attempts to cancel the task managed by the agent executor.
-	OnCancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error)
+	OnCancelTask(ctx *server.CallContext, params types.TaskIdParams) (*types.Task, error)
 	// OnSetTaskPushNotificationConfig sets the push notification configuration for a task.
-	OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error)
+	OnSetTaskPushNotificationConfig(ctx *server.CallContext, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error)
 	// OnGetTaskPushNotificationConfig retrieves the push notification configuration for a task.
-	OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error)
+	OnGetTaskPushNotificationConfig(ctx *server.CallContext, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error)
 	// OnResubscribeToTask resubscribes to task events and returns a stream of events.
-	OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent
+	OnResubscribeToTask(ctx *server.CallContext, params types.TaskIdParams) <-chan types.StreamEvent
 }
 
 // DefaultHandler provides a default implementation of the Handler interface.
@@ -67,7 +68,7 @@ func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, 
 }
 
 // OnGetTask handles task retrieval requests.
-func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryParams) (*types.Task, error) {
+func (d *DefaultHandler) OnGetTask(ctx *server.CallContext, params types.TaskQueryParams) (*types.Task, error) {
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
 		return nil, err
@@ -76,7 +77,7 @@ func (d *DefaultHandler) OnGetTask(ctx context.Context, params types.TaskQueryPa
 }
 
 // OnMessageSend handles synchronous message send requests and waits for the result.
-func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.MessageSendParam) (types.Event, error) {
+func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.MessageSendParam) (types.Event, error) {
 	taskManager := manager.NewTaskManger(
 		d.store,
 		manager.WithTaskId(params.Message.TaskID),
@@ -111,6 +112,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 		execution.WithTaskId(task.Id),
 		execution.WithContextId(params.Message.ContextID),
 		execution.WithTask(task),
+		execution.WithServerContext(ctx),
 	)
 
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
@@ -135,7 +137,7 @@ func (d *DefaultHandler) OnMessageSend(ctx context.Context, params types.Message
 }
 
 // OnMessageSendStream handles streaming message send requests, returning a channel of events.
-func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.MessageSendParam) <-chan types.StreamEvent {
+func (d *DefaultHandler) OnMessageSendStream(ctx *server.CallContext, params types.MessageSendParam) <-chan types.StreamEvent {
 	errorStream := func(err error) <-chan types.StreamEvent {
 		ch := make(chan types.StreamEvent, 1)
 		ch <- types.StreamEvent{Type: types.EventError, Err: err}
@@ -168,6 +170,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 		execution.WithTaskId(task.Id),
 		execution.WithContextId(task.ContextId),
 		execution.WithTask(task),
+		execution.WithServerContext(ctx),
 	)
 
 	d.execute(ctx, reqCtx, queue)
@@ -177,7 +180,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx context.Context, params types.M
 }
 
 // OnCancelTask handles task cancellation requests.
-func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdParams) (*types.Task, error) {
+func (d *DefaultHandler) OnCancelTask(ctx *server.CallContext, params types.TaskIdParams) (*types.Task, error) {
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
 		return nil, err
@@ -213,7 +216,7 @@ func (d *DefaultHandler) OnCancelTask(ctx context.Context, params types.TaskIdPa
 }
 
 // OnSetTaskPushNotificationConfig sets push notification configuration for a task.
-func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error) {
+func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx *server.CallContext, params types.TaskPushNotificationConfig) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
 		return nil, errs.ErrUnsupportedOperation
 	}
@@ -227,7 +230,7 @@ func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx context.Context, pa
 }
 
 // OnGetTaskPushNotificationConfig retrieves push notification configuration for a task.
-func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error) {
+func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx *server.CallContext, params types.TaskIdParams) (*types.TaskPushNotificationConfig, error) {
 	if d.pushNotifier == nil {
 		return nil, errs.ErrUnsupportedOperation
 	}
@@ -252,7 +255,7 @@ func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx context.Context, pa
 }
 
 // OnResubscribeToTask handles resubscription to task events, returning a channel of events.
-func (d *DefaultHandler) OnResubscribeToTask(ctx context.Context, params types.TaskIdParams) <-chan types.StreamEvent {
+func (d *DefaultHandler) OnResubscribeToTask(ctx *server.CallContext, params types.TaskIdParams) <-chan types.StreamEvent {
 	errorStream := func(err error) <-chan types.StreamEvent {
 		ch := make(chan types.StreamEvent, 1)
 		ch <- types.StreamEvent{Type: types.EventError, Err: err}

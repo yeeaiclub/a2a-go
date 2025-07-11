@@ -20,6 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yeeaiclub/a2a-go/sdk/server"
 	"github.com/yeeaiclub/a2a-go/sdk/server/event"
 	"github.com/yeeaiclub/a2a-go/sdk/server/execution"
 	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
@@ -78,7 +79,9 @@ func TestGatTask(t *testing.T) {
 			name:  "on get card",
 			input: types.TaskQueryParams{Id: "1"},
 			before: func(store tasks.TaskStore) {
-				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
+				ctx := server.NewCallContext(context.Background())
+				defer ctx.Release()
+				err := store.Save(ctx, &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
 			},
 			want: &types.Task{Id: "1", ContextId: "2"},
@@ -91,7 +94,9 @@ func TestGatTask(t *testing.T) {
 			tc.before(store)
 			executor := newExecutor()
 			handler := NewDefaultHandler(store, executor)
-			task, err := handler.OnGetTask(context.Background(), tc.input)
+			ctx := server.NewCallContext(context.Background())
+			defer ctx.Release()
+			task, err := handler.OnGetTask(ctx, tc.input)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, task)
 		})
@@ -109,7 +114,9 @@ func TestOnMessageSend(t *testing.T) {
 			name:  "on message send",
 			input: types.MessageSendParam{Message: &types.Message{TaskID: "1", ContextID: "2"}},
 			before: func(store tasks.TaskStore) {
-				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
+				ctx := server.NewCallContext(context.Background())
+				defer ctx.Release()
+				err := store.Save(ctx, &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
 			},
 			want: &types.Task{Id: "1", ContextId: "2", History: []*types.Message{{TaskID: "1", ContextID: "2"}}},
@@ -123,7 +130,9 @@ func TestOnMessageSend(t *testing.T) {
 			executor := newExecutor()
 			manger := QueueManger{}
 			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
-			ev, err := handler.OnMessageSend(context.Background(), tc.input)
+			ctx := server.NewCallContext(context.Background())
+			defer ctx.Release()
+			ev, err := handler.OnMessageSend(ctx, tc.input)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, ev)
 		})
@@ -142,7 +151,9 @@ func TestOnMessageSendStream(t *testing.T) {
 			name:  "on message stream",
 			input: types.MessageSendParam{Message: &types.Message{TaskID: "1", ContextID: "2"}},
 			before: func(store tasks.TaskStore) {
-				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
+				ctx := server.NewCallContext(context.Background())
+				defer ctx.Release()
+				err := store.Save(ctx, &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
 			},
 			want: []types.Event{&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true, Status: types.TaskStatus{State: types.COMPLETED}}},
@@ -156,7 +167,9 @@ func TestOnMessageSendStream(t *testing.T) {
 			executor := newExecutor()
 			manager := QueueManger{}
 			handler := NewDefaultHandler(store, executor, WithQueueManger(manager))
-			events := handler.OnMessageSendStream(context.Background(), tc.input)
+			ctx := server.NewCallContext(context.Background())
+			defer ctx.Release()
+			events := handler.OnMessageSendStream(ctx, tc.input)
 			var received []types.Event
 			for ev := range events {
 				require.NoError(t, ev.Err)
@@ -185,7 +198,9 @@ func TestOnCancelTask(t *testing.T) {
 			name:  "cancel task",
 			input: types.TaskIdParams{Id: "1"},
 			before: func(store tasks.TaskStore) {
-				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
+				ctx := server.NewCallContext(context.Background())
+				defer ctx.Release()
+				err := store.Save(ctx, &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
 			},
 			want: &types.Task{Id: "1", ContextId: "2"},
@@ -199,7 +214,9 @@ func TestOnCancelTask(t *testing.T) {
 			executor := newExecutor()
 			manger := QueueManger{}
 			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
-			task, err := handler.OnCancelTask(context.Background(), tc.input)
+			ctx := server.NewCallContext(context.Background())
+			defer ctx.Release()
+			task, err := handler.OnCancelTask(ctx, tc.input)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, task)
 		})

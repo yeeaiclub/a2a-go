@@ -15,13 +15,13 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	log "github.com/yeeaiclub/a2a-go/internal/logger"
+	"github.com/yeeaiclub/a2a-go/sdk/server"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
@@ -44,7 +44,7 @@ type Server struct {
 
 // NewServer creates a new Server with the given configuration and options.
 func NewServer(cardPath string, basePath string, card types.AgentCard, handler Handler, options ...ServerConfigOption) *Server {
-	server := &Server{
+	svc := &Server{
 		basePath:      basePath,
 		agentCardPath: cardPath,
 		card:          card,
@@ -54,9 +54,9 @@ func NewServer(cardPath string, basePath string, card types.AgentCard, handler H
 		idleTimeout:   defaultIdleTimeout,
 	}
 	for _, opt := range options {
-		opt.Option(server)
+		opt.Option(svc)
 	}
-	return server
+	return svc
 }
 
 // Start launches the HTTP server on the specified port.
@@ -64,16 +64,16 @@ func (s *Server) Start(port int) error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.agentCardPath, s.handleGetAgentCard)
 	mux.Handle(s.basePath, s)
-	server := &http.Server{
+	svc := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
 		Handler:      mux,
 		ReadTimeout:  s.readTimeout,
 		WriteTimeout: s.writeTimeout,
 		IdleTimeout:  s.idleTimeout,
 	}
-	log.Infof("Starting HTTP server on :%d with ReadTimeout=%v, WriteTimeout=%v, IdleTimeout=%v",
+	log.Infof("Starting HTTP svc on :%d with ReadTimeout=%v, WriteTimeout=%v, IdleTimeout=%v",
 		port, s.readTimeout, s.writeTimeout, s.idleTimeout)
-	return server.ListenAndServe()
+	return svc.ListenAndServe()
 }
 
 // handleGetAgentCard handles GET requests for the agent card metadata.
@@ -102,34 +102,40 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.sendError(w, request.Id, types.JSONParseError(err))
 		return
 	}
+
+	// Create CallContext with the HTTP request
+	callCtx := server.NewCallContextWithRequest(r)
+	// Ensure the context is released back to the pool when the request is done
+	defer callCtx.Release()
+
 	switch request.Method {
 	case types.MethodMessageSend:
-		s.handleMessageSend(r.Context(), w, &request, request.Id)
+		s.handleMessageSend(callCtx, w, &request, request.Id)
 	case types.MethodMessageStream:
-		s.handleMessageSendStream(r.Context(), w, &request, request.Id)
+		s.handleMessageSendStream(callCtx, w, &request, request.Id)
 	case types.MethodTasksGet:
-		s.handleGetTask(r.Context(), w, &request, request.Id)
+		s.handleGetTask(callCtx, w, &request, request.Id)
 	case types.MethodTasksCancel:
-		s.handleCancelTask(r.Context(), w, &request, request.Id)
+		s.handleCancelTask(callCtx, w, &request, request.Id)
 	case types.MethodPushNotificationSet:
-		s.handleSetTaskPushNotificationConfig(r.Context(), w, &request, request.Id)
+		s.handleSetTaskPushNotificationConfig(callCtx, w, &request, request.Id)
 	case types.MethodPushNotificationGet:
-		s.handleGetTaskPushNotificationConfig(r.Context(), w, &request, request.Id)
+		s.handleGetTaskPushNotificationConfig(callCtx, w, &request, request.Id)
 	case types.MethodTasksResubscribe:
-		s.handleResubscribeToTask(r.Context(), w, &request, request.Id)
+		s.handleResubscribeToTask(callCtx, w, &request, request.Id)
 	default:
 		log.Warnf("Unknown method: %s", request.Method)
 	}
 }
 
-// handleMessageSend handles the message/send JSON-RPC method.
-func (s *Server) handleMessageSend(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleMessageSend(ctx *server.CallContext, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	log.Infof("handleMessageSend called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.MessageSendParam](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
+
 	event, err := s.handler.OnMessageSend(ctx, params)
 	if err != nil {
 		log.Errorf("handleMessageSend | onMessageSend | %v", err)
@@ -139,8 +145,7 @@ func (s *Server) handleMessageSend(ctx context.Context, w http.ResponseWriter, r
 	s.sendResponse(w, id, event)
 }
 
-// handleMessageSendStream handles the message/stream JSON-RPC method with server-sent events (SSE).
-func (s *Server) handleMessageSendStream(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleMessageSendStream(ctx *server.CallContext, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	log.Infof("handleMessageSendStream called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.MessageSendParam](request.Params)
 	if err != nil {
@@ -191,7 +196,7 @@ func (s *Server) handleMessageSendStream(ctx context.Context, w http.ResponseWri
 }
 
 // handleGetTask handles the tasks/get JSON-RPC method.
-func (s *Server) handleGetTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleGetTask(ctx *server.CallContext, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	log.Infof("handleGetTask called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskQueryParams](request.Params)
 	if err != nil {
@@ -208,13 +213,14 @@ func (s *Server) handleGetTask(ctx context.Context, w http.ResponseWriter, reque
 }
 
 // handleCancelTask handles the tasks/cancel JSON-RPC method.
-func (s *Server) handleCancelTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleCancelTask(ctx *server.CallContext, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	log.Infof("handleCancelTask called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
+
 	event, err := s.handler.OnCancelTask(ctx, params)
 	if err != nil {
 		log.Errorf("handleCancelTaskk | onCancelTask | %v", err)
@@ -225,13 +231,14 @@ func (s *Server) handleCancelTask(ctx context.Context, w http.ResponseWriter, re
 }
 
 // handleSetTaskPushNotificationConfig handles the tasks/pushNotificationConfig/set JSON-RPC method.
-func (s *Server) handleSetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleSetTaskPushNotificationConfig(ctx *server.CallContext, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	log.Infof("handleSetTaskPushNotificationConfig called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskPushNotificationConfig](request.Params)
 	if err != nil {
 		s.sendError(w, id, types.JSONParseError(err))
 		return
 	}
+
 	event, err := s.handler.OnSetTaskPushNotificationConfig(ctx, params)
 	if err != nil {
 		log.Errorf("handleSetTaskPushNotificationConfig | OnSetTaskPushNotificationConfig | %v", err)
@@ -242,7 +249,7 @@ func (s *Server) handleSetTaskPushNotificationConfig(ctx context.Context, w http
 }
 
 // handleGetTaskPushNotificationConfig handles the tasks/pushNotificationConfig/get JSON-RPC method.
-func (s *Server) handleGetTaskPushNotificationConfig(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleGetTaskPushNotificationConfig(ctx *server.CallContext, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	log.Infof("handleGetTaskPushNotificationConfig called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
@@ -260,7 +267,7 @@ func (s *Server) handleGetTaskPushNotificationConfig(ctx context.Context, w http
 }
 
 // handleResubscribeToTask handles the tasks/resubscribe JSON-RPC method with SSE.
-func (s *Server) handleResubscribeToTask(ctx context.Context, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
+func (s *Server) handleResubscribeToTask(ctx *server.CallContext, w http.ResponseWriter, request *types.JSONRPCRequest, id string) {
 	log.Infof("handleResubscribeToTask called | id=%s, method=%s", id, request.Method)
 	params, err := types.MapTo[types.TaskIdParams](request.Params)
 	if err != nil {
