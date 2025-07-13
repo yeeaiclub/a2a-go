@@ -14,6 +14,11 @@
 
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 type TaskState string
 
 const (
@@ -41,6 +46,39 @@ type Artifact struct {
 	Metadata    map[string]any `json:"metadata,omitempty"`
 	Name        string         `json:"name,omitempty"`
 	Parts       []Part         `json:"parts,omitempty"`
+}
+
+func (a *Artifact) UnmarshalJSON(data []byte) error {
+	aux := &struct {
+		ArtifactId  string            `json:"artifact_id,omitempty"`
+		Description string            `json:"description,omitempty"`
+		Extensions  []string          `json:"extension,omitempty"`
+		Metadata    map[string]any    `json:"metadata,omitempty"`
+		Name        string            `json:"name,omitempty"`
+		Parts       []json.RawMessage `json:"parts,omitempty"`
+	}{}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	a.ArtifactId = aux.ArtifactId
+	a.Description = aux.Description
+	a.Extensions = aux.Extensions
+	a.Metadata = aux.Metadata
+	a.Name = aux.Name
+
+	// Unmarshal parts
+	a.Parts = make([]Part, len(aux.Parts))
+	for i, partData := range aux.Parts {
+		part, err := UnmarshalPart(partData)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal part %d: %w", i, err)
+		}
+		a.Parts[i] = part
+	}
+
+	return nil
 }
 
 type Task struct {
@@ -72,4 +110,43 @@ func (t *Task) GetTaskId() string {
 
 func (t *Task) EventType() string {
 	return "task"
+}
+
+func (t *Task) UnmarshalJSON(data []byte) error {
+	aux := &struct {
+		Id        string            `json:"id"`
+		ContextId string            `json:"context_id"`
+		History   []*Message        `json:"history,omitempty"`
+		Kind      string            `json:"kind,omitempty"`
+		Status    TaskStatus        `json:"task_status,omitempty"`
+		Metadata  map[string]any    `json:"metadata,omitempty"`
+		Artifacts []json.RawMessage `json:"artifacts,omitempty"`
+	}{}
+
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	t.Id = aux.Id
+	t.ContextId = aux.ContextId
+	t.History = aux.History
+	t.Kind = aux.Kind
+	t.Status = aux.Status
+	t.Metadata = aux.Metadata
+
+	if aux.Artifacts == nil {
+		t.Artifacts = []Artifact{}
+	} else {
+		// Unmarshal artifacts
+		t.Artifacts = make([]Artifact, len(aux.Artifacts))
+		for i, artifactData := range aux.Artifacts {
+			var artifact Artifact
+			if err := json.Unmarshal(artifactData, &artifact); err != nil {
+				return fmt.Errorf("failed to unmarshal artifact %d: %w", i, err)
+			}
+			t.Artifacts[i] = artifact
+		}
+	}
+
+	return nil
 }

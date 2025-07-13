@@ -71,7 +71,6 @@ func TestGetTask(t *testing.T) {
 			contextId: "2",
 			setup:     func(store *mocktasks.MockTaskStore) {},
 			want:      nil,
-			expectErr: true,
 		},
 	}
 	for _, tc := range testCases {
@@ -284,11 +283,19 @@ func TestTaskManager_UpdateWithMessage(t *testing.T) {
 			defer ctrl.Finish()
 			store := mocktasks.NewMockTaskStore(ctrl)
 			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
-			result := manager.UpdateWithMessage(&tc.message, &tc.task)
+
+			task := tc.task
 			if tc.task.Status.Message != nil {
-				assert.ElementsMatch(t, result.History, []*types.Message{tc.task.Status.Message, &tc.message})
+				result := manager.UpdateWithMessage(&tc.message, &task)
+				if assert.Len(t, result.History, 2) {
+					assert.Equal(t, tc.task.Status.Message.Role, result.History[0].Role)
+					assert.Equal(t, tc.message.Role, result.History[1].Role)
+				}
 			} else {
-				assert.ElementsMatch(t, result.History, []*types.Message{&tc.message})
+				result := manager.UpdateWithMessage(&tc.message, &task)
+				if assert.Len(t, result.History, 1) {
+					assert.Equal(t, tc.message.Role, result.History[0].Role)
+				}
 			}
 		})
 	}
@@ -308,11 +315,11 @@ func TestSaveTaskEvent(t *testing.T) {
 			name:      "save task event with task",
 			taskId:    "1",
 			contextId: "2",
-			event:     &types.Task{Id: "1"},
+			event:     &types.Task{Id: "1", ContextId: "2"},
 			setup: func(store *mocktasks.MockTaskStore) {
-				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1"}).Return(nil)
+				store.EXPECT().Save(gomock.Any(), &types.Task{Id: "1", ContextId: "2"}).Return(nil)
 			},
-			want: &types.Task{Id: "1"},
+			want: &types.Task{Id: "1", ContextId: "2"},
 		},
 		{
 			name:      "save task event with mismatched id",

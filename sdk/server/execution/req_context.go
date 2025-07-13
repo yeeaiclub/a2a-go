@@ -16,6 +16,7 @@ package execution
 
 import (
 	"github.com/google/uuid"
+	"github.com/yeeaiclub/a2a-go/internal/errs"
 	"github.com/yeeaiclub/a2a-go/sdk/server"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
@@ -28,16 +29,46 @@ type RequestContext struct {
 	CallContext *server.CallContext
 }
 
-func NewRequestContext(options ...RequestContextOption) *RequestContext {
+func NewRequestContext(options ...RequestContextOption) (*RequestContext, error) {
 	reqContext := &RequestContext{}
 
 	for _, opt := range options {
 		opt.Option(reqContext)
 	}
-	if reqContext.TaskId == "" {
-		reqContext.TaskId = uuid.New().String()
+
+	tid := reqContext.TaskId
+	cid := reqContext.ContextId
+	if tid == "" && reqContext.Params.Message != nil && reqContext.Params.Message.TaskID != "" {
+		tid = reqContext.Params.Message.TaskID
 	}
-	return reqContext
+	if tid == "" {
+		tid = uuid.New().String()
+	}
+	if cid == "" && reqContext.Params.Message != nil && reqContext.Params.Message.ContextID != "" {
+		cid = reqContext.Params.Message.ContextID
+	}
+	if cid == "" {
+		cid = uuid.New().String()
+	}
+
+	if reqContext.Params.Message != nil {
+		reqContext.Params.Message.TaskID = tid
+		reqContext.Params.Message.ContextID = cid
+	}
+
+	if reqContext.Task != nil {
+		if reqContext.Task.Id != "" && reqContext.Task.Id != tid {
+			return nil, errs.ErrBadTaskId
+		}
+		if reqContext.Task.ContextId != "" && reqContext.Task.ContextId != cid {
+			return nil, errs.ErrBadTaskId
+		}
+	}
+
+	reqContext.TaskId = tid
+	reqContext.ContextId = cid
+
+	return reqContext, nil
 }
 
 type RequestContextOption interface {

@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/yeeaiclub/a2a-go/internal/errs"
 	"github.com/yeeaiclub/a2a-go/sdk/server"
 	"github.com/yeeaiclub/a2a-go/sdk/server/event"
@@ -85,7 +84,7 @@ func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.Mes
 		manager.WithInitMessage(params.Message),
 	)
 
-	task, err := d.store.Get(ctx, params.Message.TaskID)
+	task, err := taskManager.GetTask(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -103,19 +102,18 @@ func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.Mes
 		}
 	}
 
-	if task == nil {
-		task = &types.Task{Id: uuid.New().String()}
-	}
-
-	reqContext := execution.NewRequestContext(
+	reqContext, err := execution.NewRequestContext(
 		execution.WithParams(params),
-		execution.WithTaskId(task.Id),
+		execution.WithTaskId(params.Message.TaskID),
 		execution.WithContextId(params.Message.ContextID),
 		execution.WithTask(task),
 		execution.WithServerContext(ctx),
 	)
+	if err != nil {
+		return nil, err
+	}
 
-	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
+	queue, err := d.queueManger.CreateOrTap(ctx, reqContext.TaskId)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +128,7 @@ func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.Mes
 		return nil, err
 	}
 
-	if ev.EventType() == "task" && ev.GetTaskId() != task.Id {
+	if ev.EventType() == "task" && ev.GetTaskId() != reqContext.TaskId {
 		return nil, errs.ErrTaskIdMissingMatch
 	}
 	return ev, nil
@@ -156,24 +154,24 @@ func (d *DefaultHandler) OnMessageSendStream(ctx *server.CallContext, params typ
 	if err != nil {
 		return errorStream(err)
 	}
-	if task == nil {
-		task = &types.Task{Id: uuid.New().String()}
-	}
 
-	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
+	reqContext, err := execution.NewRequestContext(
+		execution.WithParams(params),
+		execution.WithTaskId(params.Message.TaskID),
+		execution.WithContextId(params.Message.ContextID),
+		execution.WithTask(task),
+		execution.WithServerContext(ctx),
+	)
 	if err != nil {
 		return errorStream(err)
 	}
 
-	reqCtx := execution.NewRequestContext(
-		execution.WithParams(params),
-		execution.WithTaskId(task.Id),
-		execution.WithContextId(task.ContextId),
-		execution.WithTask(task),
-		execution.WithServerContext(ctx),
-	)
+	queue, err := d.queueManger.CreateOrTap(ctx, reqContext.TaskId)
+	if err != nil {
+		return errorStream(err)
+	}
 
-	d.execute(ctx, reqCtx, queue)
+	d.execute(ctx, reqContext, queue)
 
 	resultAggregator := aggregator.NewResultAggregator(taskManager, aggregator.WithBatchSize(10))
 	return resultAggregator.ConsumeAndEmit(ctx, queue)
@@ -184,6 +182,14 @@ func (d *DefaultHandler) OnCancelTask(ctx *server.CallContext, params types.Task
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
 		return nil, err
+	}
+
+	if task == nil {
+		return nil, errs.ErrTaskNotFound
+	}
+
+	if task.Id == "" {
+		return nil, errs.ErrTaskNotFound
 	}
 
 	taskManager := manager.NewTaskManger(
@@ -202,7 +208,15 @@ func (d *DefaultHandler) OnCancelTask(ctx *server.CallContext, params types.Task
 		defer queue.Close()
 	}
 
-	reqCtx := execution.NewRequestContext()
+	reqCtx, err := execution.NewRequestContext(
+		execution.WithTaskId(task.Id),
+		execution.WithContextId(task.ContextId),
+		execution.WithTask(task),
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	d.cancel(ctx, reqCtx, queue)
 	result, err := rg.ConsumeAll(ctx, queue)
 	if err != nil {
@@ -220,9 +234,16 @@ func (d *DefaultHandler) OnSetTaskPushNotificationConfig(ctx *server.CallContext
 	if d.pushNotifier == nil {
 		return nil, errs.ErrUnsupportedOperation
 	}
-	params.TaskId = uuid.New().String()
 
-	err := d.pushNotifier.SetInfo(ctx, params.TaskId, params.Config)
+	task, err := d.store.Get(ctx, params.TaskId)
+	if err != nil {
+		return nil, err
+	}
+	if task == nil {
+		return nil, errs.ErrTaskNotFound
+	}
+
+	err = d.pushNotifier.SetInfo(ctx, params.TaskId, params.Config)
 	if err != nil {
 		return nil, err
 	}
@@ -240,10 +261,6 @@ func (d *DefaultHandler) OnGetTaskPushNotificationConfig(ctx *server.CallContext
 		return nil, err
 	}
 	if task == nil {
-		return nil, errs.ErrTaskNotFound
-	}
-
-	if task.Id == "" {
 		return nil, errs.ErrTaskNotFound
 	}
 
@@ -267,7 +284,7 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx *server.CallContext, params typ
 	if err != nil {
 		return errorStream(err)
 	}
-	if task == nil || task.Id == "" {
+	if task == nil {
 		return errorStream(errs.ErrTaskNotFound)
 	}
 

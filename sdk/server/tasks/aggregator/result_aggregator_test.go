@@ -41,7 +41,7 @@ func TestConsumeAll(t *testing.T) {
 				err := store.Save(context.Background(), task)
 				require.NoError(t, err)
 
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
 				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
 			want: &types.Task{Id: "1", ContextId: "2"},
@@ -77,13 +77,13 @@ func TestConsumeAndEmit(t *testing.T) {
 		{
 			name: "consumer and emit",
 			before: func(q *event.Queue, store *tasks.InMemoryTaskStore) {
-				err := store.Save(context.Background(), &types.Task{Id: "1"})
+				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
 				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
 			want: []types.StreamEvent{
-				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false}, Type: types.EventData},
+				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false}, Type: types.EventData},
 				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true}, Type: types.EventDone},
 			},
 		},
@@ -126,25 +126,25 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 		{
 			name: "consume",
 			before: func(q *event.Queue, store *tasks.InMemoryTaskStore) {
-				err := store.Save(context.Background(), &types.Task{Id: "1"})
+				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
-				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "3", Final: true})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
+				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
-			want:        &types.Task{Id: "1"},
+			want:        &types.Task{Id: "1", ContextId: "2"},
 			expectError: nil,
 		},
 		{
 			name: "interrupt",
 			before: func(q *event.Queue, store *tasks.InMemoryTaskStore) {
-				err := store.Save(context.Background(), &types.Task{Id: "1"})
+				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "1", Final: false})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false, Status: types.TaskStatus{State: types.AUTH_REQUIRED}})
-				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "3", Final: true})
+				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
-			want:        &types.Task{Id: "1"},
+			want:        &types.Task{Id: "1", ContextId: "2"},
 			expectError: errs.ErrAuthRequired,
 		},
 	}

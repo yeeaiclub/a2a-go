@@ -161,3 +161,45 @@ func (t *TextPart) GetKind() string {
 func (t *TextPart) GetMetadata() map[string]any {
 	return t.Metadata
 }
+
+// UnmarshalPart unmarshal a JSON object into the appropriate Part type
+func UnmarshalPart(data json.RawMessage) (Part, error) {
+	// First, try to determine the type by looking for specific fields
+	var probe struct {
+		Kind string          `json:"kind"`
+		Text string          `json:"text,omitempty"`
+		File json.RawMessage `json:"file,omitempty"`
+		Data map[string]any  `json:"data,omitempty"`
+	}
+
+	if err := json.Unmarshal(data, &probe); err != nil {
+		return nil, fmt.Errorf("failed to probe part structure: %w", err)
+	}
+
+	// Determine the type based on the presence of specific fields
+	switch {
+	case probe.Text != "":
+		// TextPart
+		var textPart TextPart
+		if err := json.Unmarshal(data, &textPart); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal TextPart: %w", err)
+		}
+		return &textPart, nil
+	case probe.File != nil:
+		// FilePart
+		var filePart FilePart
+		if err := json.Unmarshal(data, &filePart); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal FilePart: %w", err)
+		}
+		return &filePart, nil
+	case probe.Data != nil:
+		// DataPart
+		var dataPart DataPart
+		if err := json.Unmarshal(data, &dataPart); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal DataPart: %w", err)
+		}
+		return &dataPart, nil
+	default:
+		return nil, fmt.Errorf("unknown part type: %s", string(data))
+	}
+}
