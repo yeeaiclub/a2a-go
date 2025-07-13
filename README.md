@@ -37,6 +37,7 @@ go get github.com/yeeaiclub/a2a-go
 ## Quick Start
 
 1. [demo](https://github.com/yeeaiclub/demo)
+2. [A github agent implement of a2a-go](https://github.com/yeeaiclub/github-a2a)
 2. [agent-platform](https://github.com/yeeaiclub/agent-platform)
 
 
