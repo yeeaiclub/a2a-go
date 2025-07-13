@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
@@ -109,7 +110,7 @@ func TestNewRequestContext(t *testing.T) {
 				WithTask(tc.tasks),
 				WithParams(tc.params),
 			)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.want, context)
 		})
 	}

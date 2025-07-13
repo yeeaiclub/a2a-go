@@ -50,12 +50,12 @@ type Artifact struct {
 
 func (a *Artifact) UnmarshalJSON(data []byte) error {
 	aux := &struct {
-		ArtifactId  string             `json:"artifact_id,omitempty"`
-		Description string             `json:"description,omitempty"`
-		Extensions  []string           `json:"extension,omitempty"`
-		Metadata    map[string]any     `json:"metadata,omitempty"`
-		Name        string             `json:"name,omitempty"`
-		Parts       []json.RawMessage  `json:"parts,omitempty"`
+		ArtifactId  string            `json:"artifact_id,omitempty"`
+		Description string            `json:"description,omitempty"`
+		Extensions  []string          `json:"extension,omitempty"`
+		Metadata    map[string]any    `json:"metadata,omitempty"`
+		Name        string            `json:"name,omitempty"`
+		Parts       []json.RawMessage `json:"parts,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(data, aux); err != nil {
@@ -114,13 +114,13 @@ func (t *Task) EventType() string {
 
 func (t *Task) UnmarshalJSON(data []byte) error {
 	aux := &struct {
-		Id        string             `json:"id"`
-		ContextId string             `json:"context_id"`
-		History   []*Message         `json:"history,omitempty"`
-		Kind      string             `json:"kind,omitempty"`
-		Status    TaskStatus         `json:"task_status,omitempty"`
-		Metadata  map[string]any     `json:"metadata,omitempty"`
-		Artifacts []json.RawMessage  `json:"artifacts,omitempty"`
+		Id        string            `json:"id"`
+		ContextId string            `json:"context_id"`
+		History   []*Message        `json:"history,omitempty"`
+		Kind      string            `json:"kind,omitempty"`
+		Status    TaskStatus        `json:"task_status,omitempty"`
+		Metadata  map[string]any    `json:"metadata,omitempty"`
+		Artifacts []json.RawMessage `json:"artifacts,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(data, aux); err != nil {
@@ -133,7 +133,6 @@ func (t *Task) UnmarshalJSON(data []byte) error {
 	t.Kind = aux.Kind
 	t.Status = aux.Status
 	t.Metadata = aux.Metadata
-
 
 	if aux.Artifacts == nil {
 		t.Artifacts = []Artifact{}

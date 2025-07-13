@@ -230,4 +230,4 @@ func TestTaskUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, "text/plain", fileWithBytes.MimeType)
 		assert.Equal(t, "test.txt", fileWithBytes.Name)
 	})
-} 
+}
