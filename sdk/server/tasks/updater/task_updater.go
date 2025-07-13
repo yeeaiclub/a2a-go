@@ -32,6 +32,36 @@ func NewTaskUpdater(queue *event.Queue, taskId string, contextId string) *TaskUp
 	return &TaskUpdater{queue: queue, taskId: taskId, contextId: contextId}
 }
 
+func (t *TaskUpdater) isFinalEvent(event types.Event) bool {
+	if statusEvent, ok := event.(*types.TaskStatusUpdateEvent); ok && statusEvent.Final {
+		return true
+	}
+
+	if _, ok := event.(*types.Message); ok {
+		return true
+	}
+
+	if taskEvent, ok := event.(*types.Task); ok {
+		state := taskEvent.Status.State
+		return state == types.COMPLETED ||
+			state == types.CANCELED ||
+			state == types.FAILED ||
+			state == types.REJECTED ||
+			state == types.UNKNOWN ||
+			state == types.InputRequired
+	}
+
+	return false
+}
+
+func (t *TaskUpdater) enqueueEvent(event types.Event) {
+	if t.isFinalEvent(event) {
+		t.queue.EnqueueDone(event)
+	} else {
+		t.queue.Enqueue(event)
+	}
+}
+
 func (t *TaskUpdater) UpdateStatus(state types.TaskState, opts ...TaskUpdaterOption) {
 	option := &TaskUpdaterOptions{}
 	for _, opt := range opts {
@@ -55,9 +85,9 @@ func (t *TaskUpdater) UpdateStatus(state types.TaskState, opts ...TaskUpdaterOpt
 
 	if option.final {
 		t.queue.EnqueueDone(task)
-		return
 	}
-	t.queue.Enqueue(task)
+
+	t.enqueueEvent(task)
 }
 
 func (t *TaskUpdater) AddArtifact(parts []types.Part, opts ...TaskUpdaterOption) {
@@ -70,7 +100,7 @@ func (t *TaskUpdater) AddArtifact(parts []types.Part, opts ...TaskUpdaterOption)
 		option.artifactId = uuid.New().String()
 	}
 
-	t.queue.EnqueueDone(&types.TaskArtifactUpdateEvent{
+	artifactEvent := &types.TaskArtifactUpdateEvent{
 		TaskId:    t.taskId,
 		ContextId: t.contextId,
 		Artifact: &types.Artifact{
@@ -79,7 +109,9 @@ func (t *TaskUpdater) AddArtifact(parts []types.Part, opts ...TaskUpdaterOption)
 			Parts:      parts,
 			Metadata:   option.metadata,
 		},
-	})
+	}
+
+	t.enqueueEvent(artifactEvent)
 }
 
 func (t *TaskUpdater) Complete(opts ...TaskUpdaterOption) {

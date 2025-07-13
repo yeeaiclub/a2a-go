@@ -40,7 +40,7 @@ func TestSendMessage(t *testing.T) {
 					TaskID: "123",
 				},
 			},
-			task: types.Task{Id: "123"},
+			task: types.Task{Id: "123", Artifacts: []types.Artifact{}},
 		},
 	}
 
@@ -79,7 +79,7 @@ func TestGetTask(t *testing.T) {
 		{
 			name:   "test get task",
 			params: types.TaskQueryParams{Id: "1"},
-			want:   types.Task{Id: "123"},
+			want:   types.Task{Id: "123", Artifacts: []types.Artifact{}},
 		},
 	}
 
@@ -119,7 +119,7 @@ func TestCancelTask(t *testing.T) {
 		{
 			name:   "cancel task",
 			params: types.TaskIdParams{Id: "123"},
-			want:   types.Task{Id: "123"},
+			want:   types.Task{Id: "123", Artifacts: []types.Artifact{}},
 		},
 	}
 

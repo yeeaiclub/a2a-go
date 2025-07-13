@@ -103,12 +103,13 @@ func TestNewRequestContext(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			context := NewRequestContext(
+			context, err := NewRequestContext(
 				WithContextId(tc.contextId),
 				WithTaskId(tc.taskId),
 				WithTask(tc.tasks),
 				WithParams(tc.params),
 			)
+			assert.NoError(t, err)
 			assert.Equal(t, tc.want, context)
 		})
 	}

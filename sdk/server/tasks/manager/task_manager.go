@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/yeeaiclub/a2a-go/internal/errs"
 	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
@@ -78,16 +77,15 @@ func NewTaskManger(store tasks.TaskStore, opts ...TaskManagerOption) *TaskManage
 // GetTask retrieves the current task, either from memory or from the store.
 func (t *TaskManager) GetTask(ctx context.Context) (*types.Task, error) {
 	if t.taskId == "" {
-		return nil, errs.ErrTaskIdNotSet
+		return nil, nil
 	}
-
 	if t.currentTask != nil {
 		return t.currentTask, nil
 	}
 
 	task, err := t.store.Get(ctx, t.taskId)
 	if err != nil {
-		return task, err
+		return nil, err
 	}
 	t.currentTask = task
 	return task, nil
@@ -97,7 +95,7 @@ func (t *TaskManager) GetTask(ctx context.Context) (*types.Task, error) {
 func (t *TaskManager) SaveTaskEvent(ctx context.Context, event types.Event) (*types.Task, error) {
 	taskId := event.GetTaskId()
 
-	if t.taskId != taskId {
+	if t.taskId != "" && t.taskId != taskId {
 		return nil, fmt.Errorf("task in event doesn't match TaskManager %s %s", t.taskId, taskId)
 	}
 
@@ -106,6 +104,10 @@ func (t *TaskManager) SaveTaskEvent(ctx context.Context, event types.Event) (*ty
 	}
 
 	if t.contextId != "" && t.contextId != event.GetContextId() {
+		return nil, fmt.Errorf("context in event doesn't match TaskManager %s %s", t.contextId, event.GetContextId())
+	}
+
+	if t.contextId == "" {
 		t.contextId = event.GetContextId()
 	}
 
@@ -135,10 +137,38 @@ func (t *TaskManager) handleEvent(ctx context.Context, event types.Event) (*type
 	}
 
 	if event.EventType() == "status_update" {
+		statusEvent, ok := event.(*types.TaskStatusUpdateEvent)
+		if !ok {
+			return nil, errors.New("invalid event type for status update event")
+		}
+
+		// Move current status message to history if it exists
 		if task.Status.Message != nil {
 			task.History = append(task.History, task.Status.Message)
 		}
+
+		// Update metadata if provided
+		if statusEvent.Metadata != nil {
+			if task.Metadata == nil {
+				task.Metadata = make(map[string]interface{})
+			}
+			for k, v := range statusEvent.Metadata {
+				task.Metadata[k] = v
+			}
+		}
+
+		// Update task status
+		task.Status = statusEvent.Status
+	} else if event.EventType() == "artifact_update" {
+		artifactEvent, ok := event.(*types.TaskArtifactUpdateEvent)
+		if !ok {
+			return nil, errors.New("invalid event type for artifact update event")
+		}
+
+		// Append artifact to task
+		t.appendArtifactToTask(task, artifactEvent)
 	}
+
 	err = t.saveTask(ctx, task)
 	if err != nil {
 		return nil, err
@@ -146,10 +176,26 @@ func (t *TaskManager) handleEvent(ctx context.Context, event types.Event) (*type
 	return task, nil
 }
 
+// appendArtifactToTask appends an artifact to the task's artifacts list
+func (t *TaskManager) appendArtifactToTask(task *types.Task, event *types.TaskArtifactUpdateEvent) {
+	if event.Artifact == nil {
+		return
+	}
+
+	// Initialize artifacts slice if it doesn't exist
+	if task.Artifacts == nil {
+		task.Artifacts = make([]types.Artifact, 0)
+	}
+
+	// Append the artifact
+	task.Artifacts = append(task.Artifacts, *event.Artifact)
+}
+
 // UpdateWithMessage updates a task in memory by adding a new message to its history.
 func (t *TaskManager) UpdateWithMessage(message *types.Message, task *types.Task) *types.Task {
 	if task.Status.Message != nil {
 		task.History = append(task.History, task.Status.Message)
+		task.Status.Message = nil
 	}
 
 	task.History = append(task.History, message)

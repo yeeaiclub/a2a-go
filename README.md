@@ -35,7 +35,9 @@ go get github.com/yeeaiclub/a2a-go
 ```
 
 ## Quick Start
-1. [demo](https://pkg.go.dev/github.com/yeeaiclub/a2a-go)
+
+1. [demo](https://github.com/yeeaiclub/demo)
+2. [agent-platform](https://github.com/yeeaiclub/agent-platform)
 
 
 
@@ -44,10 +46,6 @@ go get github.com/yeeaiclub/a2a-go
 - [GoDoc](https://pkg.go.dev/github.com/yeeaiclub/a2a-go) - API documentation
 - [A2A Specification](https://github.com/a2aproject/A2A) - Protocol specification
 
-## Related Projects
-
-- [a2a-spec](https://github.com/a2aproject/A2A) - A2A protocol specification documents
-- [a2a-python](https://github.com/a2aproject/a2a-python) - Python implementation of A2A protocol
 
 ## Contributing
 
@@ -60,5 +58,4 @@ We welcome contributions! Please read our contributing guidelines before submitt
 This project is licensed under the [Apache 2.0 License](LICENSE).
 
 ---
-
 **Keywords**: a2a-go, a2a, agent-to-agent, Go SDK, AI agents, protocol implementation, middleware, authentication, streaming, task management

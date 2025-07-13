@@ -46,7 +46,7 @@ func TestTaskUpdater_UpdateStatus(t *testing.T) {
 			if tc.final {
 				updater.UpdateStatus(tc.state, WithFinal(true))
 			} else {
-				updater.UpdateStatus(tc.state)
+			updater.UpdateStatus(tc.state)
 			}
 			ch := queue.Subscribe(context.Background())
 			e := <-ch
