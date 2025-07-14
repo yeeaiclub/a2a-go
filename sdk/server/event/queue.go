@@ -41,12 +41,14 @@ func (q *Queue) Enqueue(data types.Event) bool {
 	if q.closed.Load() {
 		return false
 	}
-	select {
-	case q.ch <- types.StreamEvent{Type: types.EventData, Event: data}:
-		return true
-	default:
+	if data == nil {
 		return false
 	}
+
+	if data.Done() {
+		return q.EnqueueDone(data)
+	}
+	return q.EnqueueEvent(data)
 }
 
 // EnqueueDone adds a done event to the queue.
@@ -57,6 +59,19 @@ func (q *Queue) EnqueueDone(data types.Event) bool {
 	}
 	select {
 	case q.ch <- types.StreamEvent{Type: types.EventDone, Event: data}:
+		return true
+	default:
+		return false
+	}
+}
+
+// EnqueueEvent adds an event to the queue
+func (q *Queue) EnqueueEvent(data types.Event) bool {
+	if q.closed.Load() {
+		return false
+	}
+	select {
+	case q.ch <- types.StreamEvent{Type: types.EventData, Event: data}:
 		return true
 	default:
 		return false

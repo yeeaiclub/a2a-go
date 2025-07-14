@@ -32,36 +32,6 @@ func NewTaskUpdater(queue *event.Queue, taskId string, contextId string) *TaskUp
 	return &TaskUpdater{queue: queue, taskId: taskId, contextId: contextId}
 }
 
-func (t *TaskUpdater) isFinalEvent(event types.Event) bool {
-	if statusEvent, ok := event.(*types.TaskStatusUpdateEvent); ok && statusEvent.Final {
-		return true
-	}
-
-	if _, ok := event.(*types.Message); ok {
-		return true
-	}
-
-	if taskEvent, ok := event.(*types.Task); ok {
-		state := taskEvent.Status.State
-		return state == types.COMPLETED ||
-			state == types.CANCELED ||
-			state == types.FAILED ||
-			state == types.REJECTED ||
-			state == types.UNKNOWN ||
-			state == types.InputRequired
-	}
-
-	return false
-}
-
-func (t *TaskUpdater) enqueueEvent(event types.Event) {
-	if t.isFinalEvent(event) {
-		t.queue.EnqueueDone(event)
-	} else {
-		t.queue.Enqueue(event)
-	}
-}
-
 func (t *TaskUpdater) UpdateStatus(state types.TaskState, opts ...TaskUpdaterOption) {
 	option := &TaskUpdaterOptions{}
 	for _, opt := range opts {
@@ -72,7 +42,7 @@ func (t *TaskUpdater) UpdateStatus(state types.TaskState, opts ...TaskUpdaterOpt
 		option.timeStamp = time.Now().Format(time.RFC3339)
 	}
 
-	task := &types.TaskStatusUpdateEvent{
+	updateEvent := &types.TaskStatusUpdateEvent{
 		TaskId:    t.taskId,
 		ContextId: t.contextId,
 		Final:     option.final,
@@ -83,11 +53,16 @@ func (t *TaskUpdater) UpdateStatus(state types.TaskState, opts ...TaskUpdaterOpt
 		},
 	}
 
-	if option.final {
-		t.queue.EnqueueDone(task)
+	if t.IsFinal(state) {
+		updateEvent.Final = true
 	}
+	t.queue.Enqueue(updateEvent)
+}
 
-	t.enqueueEvent(task)
+func (t *TaskUpdater) IsFinal(state types.TaskState) bool {
+	return state == types.FAILED || state == types.CANCELED ||
+		state == types.REJECTED || state == types.COMPLETED ||
+		state == types.InputRequired || state == types.UNKNOWN
 }
 
 func (t *TaskUpdater) AddArtifact(parts []types.Part, opts ...TaskUpdaterOption) {
@@ -110,8 +85,7 @@ func (t *TaskUpdater) AddArtifact(parts []types.Part, opts ...TaskUpdaterOption)
 			Metadata:   option.metadata,
 		},
 	}
-
-	t.enqueueEvent(artifactEvent)
+	t.queue.Enqueue(artifactEvent)
 }
 
 func (t *TaskUpdater) Complete(opts ...TaskUpdaterOption) {
@@ -135,14 +109,14 @@ func (t *TaskUpdater) StartWork(opts ...TaskUpdaterOption) {
 }
 
 // NewAgentMessage create a new message object sent by the agent for this task/context
-func (t *TaskUpdater) NewAgentMessage(parts []types.Part, opts ...TaskUpdaterOption) types.Message {
+func (t *TaskUpdater) NewAgentMessage(parts []types.Part, opts ...TaskUpdaterOption) *types.Message {
 	options := &TaskUpdaterOptions{}
 
 	for _, opt := range opts {
 		opt.Option(options)
 	}
 
-	return types.Message{
+	return &types.Message{
 		Role:      types.Agent,
 		TaskID:    t.taskId,
 		ContextID: t.contextId,

@@ -1,9 +1,11 @@
 # changelog
 
-## v0.2.1
-1. Fix issue where task ID is empty and not properly set in message parameters
-2. Fix issue where TaskArtifactUpdateEvent is not properly included in task processing
+## un release
+1. Ensured final events are always enqueued and processed (#17)
 
+## v0.2.1
+1. Fix issue where task ID is empty and not properly set in message parameters (#16)
+2. Fix issue where TaskArtifactUpdateEvent is not properly included in task processing (#16)
 
 ## v0.2.0
 1. Fix json: cannot unmarshal object into Go struct field Message.message.parts of type types.Part (#5)

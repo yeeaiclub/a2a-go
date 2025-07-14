@@ -82,39 +82,27 @@ func (t *TaskManager) GetTask(ctx context.Context) (*types.Task, error) {
 	if t.currentTask != nil {
 		return t.currentTask, nil
 	}
-
 	task, err := t.store.Get(ctx, t.taskId)
 	if err != nil {
 		return nil, err
 	}
+
 	t.currentTask = task
 	return task, nil
 }
 
-// SaveTaskEvent processes a task-related event and updates the task state.
-func (t *TaskManager) SaveTaskEvent(ctx context.Context, event types.Event) (*types.Task, error) {
-	taskId := event.GetTaskId()
-
-	if t.taskId != "" && t.taskId != taskId {
-		return nil, fmt.Errorf("task in event doesn't match TaskManager %s %s", t.taskId, taskId)
+// initTask creates a new task with the given IDs and initial state.
+func (t *TaskManager) initTask(taskId string, contextId string) *types.Task {
+	task := &types.Task{
+		Id:        taskId,
+		ContextId: contextId,
+		Status:    types.TaskStatus{State: types.SUBMITTED},
 	}
 
-	if t.taskId == "" {
-		t.taskId = taskId
+	if t.initMessage != nil {
+		task.History = append(task.History, t.initMessage)
 	}
-
-	if t.contextId != "" && t.contextId != event.GetContextId() {
-		return nil, fmt.Errorf("context in event doesn't match TaskManager %s %s", t.contextId, event.GetContextId())
-	}
-
-	if t.contextId == "" {
-		t.contextId = event.GetContextId()
-	}
-
-	if event.EventType() == "task" {
-		return t.handleTaskEvent(ctx, event)
-	}
-	return t.handleEvent(ctx, event)
+	return task
 }
 
 // handleTaskEvent handles a direct task event and saves it to the store.
@@ -136,7 +124,7 @@ func (t *TaskManager) handleEvent(ctx context.Context, event types.Event) (*type
 		return nil, err
 	}
 
-	if event.EventType() == "status_update" {
+	if event.Type() == types.EventTypeStatusUpdate {
 		statusEvent, ok := event.(*types.TaskStatusUpdateEvent)
 		if !ok {
 			return nil, errors.New("invalid event type for status update event")
@@ -157,9 +145,8 @@ func (t *TaskManager) handleEvent(ctx context.Context, event types.Event) (*type
 			}
 		}
 
-		// Update task status
 		task.Status = statusEvent.Status
-	} else if event.EventType() == "artifact_update" {
+	} else if event.Type() == "artifact_update" {
 		artifactEvent, ok := event.(*types.TaskArtifactUpdateEvent)
 		if !ok {
 			return nil, errors.New("invalid event type for artifact update event")
@@ -203,6 +190,32 @@ func (t *TaskManager) UpdateWithMessage(message *types.Message, task *types.Task
 	return task
 }
 
+// SaveTaskEvent processes a task-related event and updates the task state.
+func (t *TaskManager) SaveTaskEvent(ctx context.Context, event types.Event) (*types.Task, error) {
+	taskId := event.GetTaskId()
+
+	if t.taskId != "" && t.taskId != taskId {
+		return nil, fmt.Errorf("task in event doesn't match TaskManager %s %s", t.taskId, taskId)
+	}
+
+	if t.taskId == "" {
+		t.taskId = taskId
+	}
+
+	if t.contextId != "" && t.contextId != event.GetContextId() {
+		return nil, fmt.Errorf("context in event doesn't match TaskManager %s %s", t.contextId, event.GetContextId())
+	}
+
+	if t.contextId == "" {
+		t.contextId = event.GetContextId()
+	}
+
+	if event.Type() == "task" {
+		return t.handleTaskEvent(ctx, event)
+	}
+	return t.handleEvent(ctx, event)
+}
+
 // Process processes a task event and returns the event or error.
 func (t *TaskManager) Process(ctx context.Context, event types.Event) (types.Event, error) {
 	_, err := t.SaveTaskEvent(ctx, event)
@@ -218,6 +231,7 @@ func (t *TaskManager) saveTask(ctx context.Context, task *types.Task) error {
 	if err != nil {
 		return err
 	}
+
 	t.currentTask = task
 
 	if t.taskId == "" {
@@ -230,8 +244,10 @@ func (t *TaskManager) saveTask(ctx context.Context, task *types.Task) error {
 // EnsureTask ensures a task exists for the given event, creating it if necessary.
 func (t *TaskManager) EnsureTask(ctx context.Context, event types.Event) (*types.Task, error) {
 	task := t.currentTask
-	if task == nil && t.taskId != "" {
-		newTask, err := t.store.Get(ctx, t.taskId)
+	taskId := t.taskId
+
+	if task == nil && taskId != "" {
+		newTask, err := t.store.Get(ctx, taskId)
 		if err != nil {
 			return nil, err
 		}
@@ -246,18 +262,4 @@ func (t *TaskManager) EnsureTask(ctx context.Context, event types.Event) (*types
 		return newTask, nil
 	}
 	return task, nil
-}
-
-// initTask creates a new task with the given IDs and initial state.
-func (t *TaskManager) initTask(taskId string, contextId string) *types.Task {
-	task := &types.Task{
-		Id:        taskId,
-		ContextId: contextId,
-		Status:    types.TaskStatus{State: types.SUBMITTED},
-	}
-
-	if t.initMessage != nil {
-		task.History = append(task.History, t.initMessage)
-	}
-	return task
 }

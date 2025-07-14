@@ -128,7 +128,7 @@ func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.Mes
 		return nil, err
 	}
 
-	if ev.EventType() == "task" && ev.GetTaskId() != reqContext.TaskId {
+	if ev != nil && ev.Type() == "task" && ev.GetTaskId() != reqContext.TaskId {
 		return nil, errs.ErrTaskIdMissingMatch
 	}
 	return ev, nil
@@ -223,7 +223,7 @@ func (d *DefaultHandler) OnCancelTask(ctx *server.CallContext, params types.Task
 		return nil, err
 	}
 
-	if result.EventType() == "task" {
+	if result.Type() == "task" {
 		return result.(*types.Task), nil
 	}
 	return nil, errs.ErrInValidResponse
@@ -324,17 +324,12 @@ func (d *DefaultHandler) cancel(ctx context.Context, reqCtx *execution.RequestCo
 
 // shouldAddPushInfo checks if push notification info should be added for the request.
 func (d *DefaultHandler) shouldAddPushInfo(params types.MessageSendParam) bool {
-	return d.pushNotifier != nil &&
-		params.Configuration != nil &&
-		params.Configuration.PushNotificationConfig != nil
+	return d.pushNotifier != nil && params.Configuration != nil && params.Configuration.PushNotificationConfig != nil
 }
 
 // IsTerminalTaskSates returns true if the task state is terminal (completed, canceled, failed, rejected).
 func (d *DefaultHandler) IsTerminalTaskSates(state types.TaskState) bool {
-	return state == types.COMPLETED ||
-		state == types.CANCELED ||
-		state == types.FAILED ||
-		state == types.REJECTED
+	return state == types.COMPLETED || state == types.CANCELED || state == types.FAILED || state == types.REJECTED
 }
 
 // HandlerOption allows customizing DefaultHandler via functional options.

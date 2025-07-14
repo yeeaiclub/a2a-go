@@ -24,7 +24,7 @@ import (
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
-func TestTaskUpdater_UpdateStatus(t *testing.T) {
+func TestUpdateStatus(t *testing.T) {
 	tests := []struct {
 		name      string
 		taskId    string
@@ -34,8 +34,8 @@ func TestTaskUpdater_UpdateStatus(t *testing.T) {
 	}{
 		{"working status", "tid", "cid", types.WORKING, false},
 		{"completed status", "tid", "cid", types.COMPLETED, true},
-		{"failed status", "tid", "cid", types.FAILED, false},
-		{"rejected status", "tid", "cid", types.REJECTED, false},
+		{"failed status", "tid", "cid", types.FAILED, true},
+		{"rejected status", "tid", "cid", types.REJECTED, true},
 	}
 
 	for _, tc := range tests {
@@ -43,11 +43,7 @@ func TestTaskUpdater_UpdateStatus(t *testing.T) {
 			queue := event.NewQueue(10)
 			defer queue.Close()
 			updater := NewTaskUpdater(queue, tc.taskId, tc.contextId)
-			if tc.final {
-				updater.UpdateStatus(tc.state, WithFinal(true))
-			} else {
-				updater.UpdateStatus(tc.state)
-			}
+			updater.UpdateStatus(tc.state)
 			ch := queue.Subscribe(context.Background())
 			e := <-ch
 			statusEvent, ok := e.Event.(*types.TaskStatusUpdateEvent)
@@ -65,16 +61,16 @@ func TestTaskUpdater_UpdateStatus(t *testing.T) {
 	}
 }
 
-func TestTaskUpdater_Complete_Failed_Reject(t *testing.T) {
+func TestComplete_Failed_Reject(t *testing.T) {
 	tests := []struct {
 		name  string
 		fn    func(updater *TaskUpdater)
 		state types.TaskState
 		final bool
 	}{
-		{"complete", func(u *TaskUpdater) { u.Complete(WithFinal(true)) }, types.COMPLETED, true},
-		{"failed", func(u *TaskUpdater) { u.Failed() }, types.FAILED, false},
-		{"reject", func(u *TaskUpdater) { u.Reject() }, types.REJECTED, false},
+		{"complete", func(u *TaskUpdater) { u.Complete() }, types.COMPLETED, true},
+		{"failed", func(u *TaskUpdater) { u.Failed() }, types.FAILED, true},
+		{"reject", func(u *TaskUpdater) { u.Reject() }, types.REJECTED, true},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -86,15 +82,13 @@ func TestTaskUpdater_Complete_Failed_Reject(t *testing.T) {
 			statusEvent, ok := e.Event.(*types.TaskStatusUpdateEvent)
 			assert.True(t, ok)
 			assert.Equal(t, tc.state, statusEvent.Status.State)
-			if tc.final {
-				assert.True(t, statusEvent.Final)
-			}
+			assert.True(t, statusEvent.Final)
 			queue.Close()
 		})
 	}
 }
 
-func TestTaskUpdater_AddArtifact(t *testing.T) {
+func TestAddArtifact(t *testing.T) {
 	t.Run("add artifact", func(t *testing.T) {
 		queue := event.NewQueue(10)
 		defer queue.Close()
@@ -113,7 +107,7 @@ func TestTaskUpdater_AddArtifact(t *testing.T) {
 	})
 }
 
-func TestTaskUpdater_NewAgentMessage(t *testing.T) {
+func TestNewAgentMessage(t *testing.T) {
 	t.Run("new agent message", func(t *testing.T) {
 		updater := NewTaskUpdater(nil, "tid", "cid")
 		parts := []types.Part{&types.TextPart{Kind: "text", Text: "msg"}}
@@ -127,7 +121,7 @@ func TestTaskUpdater_NewAgentMessage(t *testing.T) {
 	})
 }
 
-func TestTaskUpdater_TimestampOption(t *testing.T) {
+func TestTimestampOption(t *testing.T) {
 	t.Run("timestamp option", func(t *testing.T) {
 		queue := event.NewQueue(10)
 		defer queue.Close()
