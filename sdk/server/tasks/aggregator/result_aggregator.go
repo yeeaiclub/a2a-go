@@ -31,6 +31,28 @@ type ResultAggregator struct {
 	batchSize int
 }
 
+type ResultAggregatorOption interface {
+	Option(rg *ResultAggregator)
+}
+
+type ResultAggregatorOptionFunc func(rg *ResultAggregator)
+
+func (fn ResultAggregatorOptionFunc) Option(rg *ResultAggregator) {
+	fn(rg)
+}
+
+func WithMessage(message *types.Message) ResultAggregatorOption {
+	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
+		rg.message = message
+	})
+}
+
+func WithBatchSize(batch int) ResultAggregatorOptionFunc {
+	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
+		rg.batchSize = batch
+	})
+}
+
 func NewResultAggregator(taskManger *manager.TaskManager, options ...ResultAggregatorOption) *ResultAggregator {
 	rg := &ResultAggregator{manager: taskManger, batchSize: 10}
 	for _, opt := range options {
@@ -55,7 +77,15 @@ func (r *ResultAggregator) ConsumeAndEmit(ctx context.Context, queue *event.Queu
 					return
 				}
 				out <- e
-			case types.EventCanceled, types.EventError, types.EventDone:
+			case types.EventDone:
+				_, err := r.manager.Process(ctx, e.Event)
+				if err != nil {
+					out <- types.StreamEvent{Type: types.EventError, Err: err}
+					return
+				}
+				out <- e
+				return
+			case types.EventCanceled, types.EventError:
 				out <- e
 				return
 			}
@@ -73,6 +103,10 @@ func (r *ResultAggregator) ConsumeAll(ctx context.Context, queue *event.Queue) (
 		case types.EventError:
 			return nil, e.Err
 		case types.EventDone:
+			_, err := r.manager.Process(ctx, e.Event)
+			if err != nil {
+				return nil, err
+			}
 			task, err := r.manager.GetTask(ctx)
 			if err != nil {
 				return nil, err
@@ -96,7 +130,6 @@ func (r *ResultAggregator) ConsumeAll(ctx context.Context, queue *event.Queue) (
 
 // ConsumeAndBreakOnInterrupt process the event stream until completion or an interruptible state is encountered
 func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, queue *event.Queue) (types.Event, error) {
-	var result types.Event
 	for e := range queue.Subscribe(ctx) {
 		switch e.Type {
 		case types.EventCanceled:
@@ -105,38 +138,60 @@ func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, queue
 			return nil, e.Err
 		case types.EventClosed:
 			task, err := r.manager.GetTask(ctx)
-			result = task
-			return result, err
+			if err != nil {
+				return nil, err
+			}
+			return task, nil
 		case types.EventDone:
+			_, err := r.manager.Process(ctx, e.Event)
+			if err != nil {
+				return nil, err
+			}
 			task, err := r.manager.GetTask(ctx)
-			result = task
-			return result, err
+			if err != nil {
+				return nil, err
+			}
+			return task, nil
 		case types.EventData:
+			if msg, ok := e.Event.(*types.Message); ok {
+				r.message = msg
+				return msg, nil
+			}
+
+			// Check for auth_required before processing the event
 			if r.IsAuthRequired(e.Event) {
+				// Start background processing
 				go r.continueConsume(ctx, queue.Subscribe(ctx))
 				return nil, errs.ErrAuthRequired
 			}
+
 			_, err := r.manager.Process(ctx, e.Event)
 			if err != nil {
 				return nil, err
 			}
 		}
 	}
-	return result, nil
+
+	// If we reach here, get the final task
+	task, err := r.manager.GetTask(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return task, nil
 }
 
 func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
-	if event.EventType() == "status_update" {
+	if event.Type() == types.EventTypeStatusUpdate {
 		updateEvent := event.(*types.TaskStatusUpdateEvent)
-		if updateEvent.Status.State == types.AUTH_REQUIRED {
+		if updateEvent.Status.State == types.AuthRequired {
 			log.Debug("Encountered an auth-required task: breaking synchronous message/send flow.")
 			return true
 		}
 	}
 
-	if event.EventType() == "task" {
+	if event.Type() == types.EventTypeTask {
 		taskEvent := event.(*types.Task)
-		if taskEvent.Status.State == types.AUTH_REQUIRED {
+		if taskEvent.Status.State == types.AuthRequired {
 			log.Debug("Encountered an auth-required task: breaking synchronous message/send flow.")
 			return true
 		}
@@ -147,34 +202,16 @@ func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
 // continueConsume processing an event stream in backhand task
 func (r *ResultAggregator) continueConsume(ctx context.Context, events <-chan types.StreamEvent) {
 	for e := range events {
-		if e.Type == types.EventDone || e.Type == types.EventClosed || e.Type == types.EventCanceled {
+		switch e.Type {
+		case types.EventClosed, types.EventCanceled, types.EventError:
 			return
-		}
-		_, err := r.manager.Process(ctx, e.Event)
-		if err != nil {
-			return
+		case types.EventDone, types.EventData:
+			if _, err := r.manager.Process(ctx, e.Event); err != nil {
+				return
+			}
+			if e.Type == types.EventDone {
+				return
+			}
 		}
 	}
-}
-
-type ResultAggregatorOption interface {
-	Option(rg *ResultAggregator)
-}
-
-type ResultAggregatorOptionFunc func(rg *ResultAggregator)
-
-func (fn ResultAggregatorOptionFunc) Option(rg *ResultAggregator) {
-	fn(rg)
-}
-
-func WithMessage(message *types.Message) ResultAggregatorOption {
-	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
-		rg.message = message
-	})
-}
-
-func WithBatchSize(batch int) ResultAggregatorOptionFunc {
-	return ResultAggregatorOptionFunc(func(rg *ResultAggregator) {
-		rg.batchSize = batch
-	})
 }

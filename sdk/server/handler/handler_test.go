@@ -36,13 +36,13 @@ func newExecutor() *Executor {
 
 func (e *Executor) Execute(ctx context.Context, requestContext *execution.RequestContext, queue *event.Queue) error {
 	u := updater.NewTaskUpdater(queue, requestContext.TaskId, requestContext.ContextId)
-	u.Complete(updater.WithFinal(true))
+	u.Complete()
 	return nil
 }
 
 func (e *Executor) Cancel(ctx context.Context, requestContext *execution.RequestContext, queue *event.Queue) error {
 	u := updater.NewTaskUpdater(queue, requestContext.TaskId, requestContext.ContextId)
-	u.Complete(updater.WithFinal(true))
+	u.Complete()
 	return nil
 }
 
@@ -134,7 +134,15 @@ func TestOnMessageSend(t *testing.T) {
 			defer ctx.Release()
 			ev, err := handler.OnMessageSend(ctx, tc.input)
 			require.NoError(t, err)
-			assert.Equal(t, tc.want, ev)
+
+			task, ok := ev.(*types.Task)
+			require.True(t, ok)
+			wantTask := tc.want.(*types.Task)
+			assert.Equal(t, wantTask.Id, task.Id)
+			assert.Equal(t, wantTask.ContextId, task.ContextId)
+			assert.Equal(t, wantTask.History, task.History)
+			assert.Equal(t, types.COMPLETED, task.Status.State)
+			assert.NotEmpty(t, task.Status.TimeStamp)
 		})
 	}
 }
@@ -218,7 +226,10 @@ func TestOnCancelTask(t *testing.T) {
 			defer ctx.Release()
 			task, err := handler.OnCancelTask(ctx, tc.input)
 			require.NoError(t, err)
-			assert.Equal(t, tc.want, task)
+			assert.Equal(t, tc.want.Id, task.Id)
+			assert.Equal(t, tc.want.ContextId, task.ContextId)
+			assert.Equal(t, types.COMPLETED, task.Status.State)
+			assert.NotEmpty(t, task.Status.TimeStamp)
 		})
 	}
 }

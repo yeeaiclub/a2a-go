@@ -29,7 +29,7 @@ const (
 	CANCELED      TaskState = "canceled"
 	FAILED        TaskState = "failed"
 	REJECTED      TaskState = "rejected"
-	AUTH_REQUIRED TaskState = "auth_required"
+	AuthRequired  TaskState = "auth_required"
 	UNKNOWN       TaskState = "unknown"
 )
 
@@ -108,8 +108,8 @@ func (t *Task) GetTaskId() string {
 	return t.Id
 }
 
-func (t *Task) EventType() string {
-	return "task"
+func (t *Task) Type() string {
+	return EventTypeTask
 }
 
 func (t *Task) UnmarshalJSON(data []byte) error {

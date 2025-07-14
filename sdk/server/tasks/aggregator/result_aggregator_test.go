@@ -42,7 +42,7 @@ func TestConsumeAll(t *testing.T) {
 				require.NoError(t, err)
 
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
-				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
 			want: &types.Task{Id: "1", ContextId: "2"},
 		},
@@ -80,7 +80,7 @@ func TestConsumeAndEmit(t *testing.T) {
 				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
-				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
 			want: []types.StreamEvent{
 				{Event: &types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false}, Type: types.EventData},
@@ -130,7 +130,7 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 				require.NoError(t, err)
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
-				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
 			want:        &types.Task{Id: "1", ContextId: "2"},
 			expectError: nil,
@@ -141,10 +141,10 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 				err := store.Save(context.Background(), &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
 				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false})
-				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false, Status: types.TaskStatus{State: types.AUTH_REQUIRED}})
-				q.EnqueueDone(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: false, Status: types.TaskStatus{State: types.AuthRequired}})
+				q.Enqueue(&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true})
 			},
-			want:        &types.Task{Id: "1", ContextId: "2"},
+			want:        nil,
 			expectError: errs.ErrAuthRequired,
 		},
 	}

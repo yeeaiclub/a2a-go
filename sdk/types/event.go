@@ -19,7 +19,7 @@ import "encoding/json"
 type Event interface {
 	GetTaskId() string
 	GetContextId() string
-	EventType() string
+	Type() string
 	Done() bool
 }
 
@@ -34,20 +34,20 @@ type TaskArtifactUpdateEvent struct {
 	Metadata  map[string]any `json:"metadata,omitempty"`
 }
 
-func (t *TaskArtifactUpdateEvent) Done() bool {
-	return true
+func (t *TaskArtifactUpdateEvent) GetTaskId() string {
+	return t.TaskId
 }
 
 func (t *TaskArtifactUpdateEvent) GetContextId() string {
 	return t.ContextId
 }
 
-func (t *TaskArtifactUpdateEvent) GetTaskId() string {
-	return t.TaskId
+func (t *TaskArtifactUpdateEvent) Type() string {
+	return EventTypeArtifactUpdate
 }
 
-func (t *TaskArtifactUpdateEvent) EventType() string {
-	return "artifact_update"
+func (t *TaskArtifactUpdateEvent) Done() bool {
+	return false
 }
 
 // TaskStatusUpdateEvent Send by server during or subscribe requests
@@ -72,8 +72,8 @@ func (t *TaskStatusUpdateEvent) GetTaskId() string {
 	return t.TaskId
 }
 
-func (t *TaskStatusUpdateEvent) EventType() string {
-	return "status_update"
+func (t *TaskStatusUpdateEvent) Type() string {
+	return EventTypeStatusUpdate
 }
 
 type StreamEvent struct {
@@ -102,4 +102,12 @@ const (
 	EventDone
 	EventClosed
 	EventCanceled
+)
+
+// Event type constants for all event implementations
+const (
+	EventTypeStatusUpdate   = "status_update"
+	EventTypeArtifactUpdate = "artifact_update"
+	EventTypeTask           = "task"
+	EventTypeMessage        = "message"
 )

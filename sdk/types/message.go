@@ -40,20 +40,20 @@ type Message struct {
 	Metadata         map[string]any `json:"metadata,omitempty"`
 }
 
-func (m *Message) Done() bool {
-	return true
+func (m *Message) GetTaskId() string {
+	return m.TaskID
 }
 
 func (m *Message) GetContextId() string {
 	return m.ContextID
 }
 
-func (m *Message) GetTaskId() string {
-	return m.TaskID
+func (m *Message) Type() string {
+	return EventTypeMessage
 }
 
-func (m *Message) EventType() string {
-	return "message"
+func (m *Message) Done() bool {
+	return true
 }
 
 func (m *Message) UnmarshalJSON(data []byte) error {
