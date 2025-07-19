@@ -1,6 +1,8 @@
 # changelog
 
-## new
+## v0.2.3
+
+fix: add nil check for message in MessageSend and MessageSendStream to prevent panic(#20)
 
 ## v0.2.2
 1. Ensured final events are always enqueued and processed (#17)

@@ -77,6 +77,9 @@ func (d *DefaultHandler) OnGetTask(ctx *server.CallContext, params types.TaskQue
 
 // OnMessageSend handles synchronous message send requests and waits for the result.
 func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.MessageSendParam) (types.Event, error) {
+	if params.Message == nil {
+		return nil, errs.ErrNilMessage
+	}
 	taskManager := manager.NewTaskManger(
 		d.store,
 		manager.WithTaskId(params.Message.TaskID),
@@ -141,6 +144,10 @@ func (d *DefaultHandler) OnMessageSendStream(ctx *server.CallContext, params typ
 		ch <- types.StreamEvent{Type: types.EventError, Err: err}
 		close(ch)
 		return ch
+	}
+
+	if params.Message == nil {
+		return errorStream(errs.ErrNilMessage)
 	}
 
 	taskManager := manager.NewTaskManger(

@@ -23,4 +23,5 @@ var (
 	ErrAuthRequired         = errors.New("authentication required")
 	ErrTaskIdMissingMatch   = errors.New("task Id mismatch in agent response")
 	ErrBadTaskId            = errors.New("bad task id: task id in request does not match the task object")
+	ErrNilMessage           = errors.New("message is nil")
 )

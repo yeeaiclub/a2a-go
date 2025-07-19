@@ -142,21 +142,6 @@ func (t *TaskManager) EnsureTask(ctx context.Context, event types.Event) (*types
 	return task, nil
 }
 
-// appendArtifactToTask appends an artifact to the task's artifacts list
-func (t *TaskManager) appendArtifactToTask(task *types.Task, event *types.TaskArtifactUpdateEvent) {
-	if event.Artifact == nil {
-		return
-	}
-
-	// Initialize artifacts slice if it doesn't exist
-	if task.Artifacts == nil {
-		task.Artifacts = make([]types.Artifact, 0)
-	}
-
-	// Append the artifact
-	task.Artifacts = append(task.Artifacts, *event.Artifact)
-}
-
 func (t *TaskManager) applyArtifactUpdate(task *types.Task, ev types.Event) error {
 	au, ok := ev.(*types.TaskArtifactUpdateEvent)
 	if !ok || au.Artifact == nil {
