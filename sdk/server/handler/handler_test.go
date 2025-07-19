@@ -210,7 +210,7 @@ func TestOnMessageSendStream(t *testing.T) {
 			var received []types.Event
 			for ev := range events {
 				if tc.wantErr != nil {
-					require.ErrorIs(t, tc.wantErr, tc.wantErr)
+					assert.ErrorIs(t, ev.Err, tc.wantErr)
 					return
 				}
 
