@@ -24,6 +24,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/yeeaiclub/a2a-go/internal/jsonx"
 	log "github.com/yeeaiclub/a2a-go/internal/logger"
 	"github.com/yeeaiclub/a2a-go/sdk/client/middleware"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
@@ -137,7 +138,7 @@ func (c *A2AClient) GetTaskPushNotificationConfig(params types.TaskIdParams) (*t
 	return &resp, nil
 }
 
-func (c *A2AClient) SendMessageStream(param types.MessageSendParam, eventChan chan any) error {
+func (c *A2AClient) SendMessageStream(param types.MessageSendParam, eventChan chan types.Event) error {
 	request := types.SendStreamingMessageRequest{
 		Id:      uuid.New().String(),
 		JSONRPC: types.Version,
@@ -181,7 +182,7 @@ func (c *A2AClient) SendMessageStream(param types.MessageSendParam, eventChan ch
 	return c.processStream(httpReq.Context(), httpResp.Body, eventChan)
 }
 
-func (c *A2AClient) ResubscribeToTask(params types.TaskIdParams, eventChan chan any) error {
+func (c *A2AClient) ResubscribeToTask(params types.TaskIdParams, eventChan chan types.Event) error {
 	request := types.TaskResubscriptionRequest{
 		Id:      uuid.New().String(),
 		JSONRPC: types.Version,
@@ -260,7 +261,7 @@ func (c *A2AClient) sendRequest(request any, resp *types.JSONRPCResponse) error 
 	return nil
 }
 
-func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan chan any) error {
+func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan chan types.Event) error {
 	scanner := bufio.NewScanner(body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -278,8 +279,21 @@ func (c *A2AClient) processStream(ctx context.Context, body io.Reader, eventChan
 		if err != nil {
 			return fmt.Errorf("failed to encode event result: %w", err)
 		}
+
+		kindMap := map[string]func() types.Event{
+			types.EventTypeTask:           func() types.Event { return &types.Task{} },
+			types.EventTypeMessage:        func() types.Event { return &types.Message{} },
+			types.EventTypeArtifactUpdate: func() types.Event { return &types.TaskArtifactUpdateEvent{} },
+			types.EventTypeStatusUpdate:   func() types.Event { return &types.TaskStatusUpdateEvent{} },
+		}
+
+		ev, err := jsonx.UnmarshalByKind(result, kindMap)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshalByKind: %w", err)
+		}
+
 		select {
-		case eventChan <- json.RawMessage(result):
+		case eventChan <- ev:
 		case <-ctx.Done():
 			return ctx.Err()
 		}

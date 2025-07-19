@@ -181,7 +181,7 @@ func (r *ResultAggregator) ConsumeAndBreakOnInterrupt(ctx context.Context, queue
 }
 
 func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
-	if event.Type() == types.EventTypeStatusUpdate {
+	if event.GetKind() == types.EventTypeStatusUpdate {
 		updateEvent := event.(*types.TaskStatusUpdateEvent)
 		if updateEvent.Status.State == types.AuthRequired {
 			log.Debug("Encountered an auth-required task: breaking synchronous message/send flow.")
@@ -189,7 +189,7 @@ func (r *ResultAggregator) IsAuthRequired(event types.Event) bool {
 		}
 	}
 
-	if event.Type() == types.EventTypeTask {
+	if event.GetKind() == types.EventTypeTask {
 		taskEvent := event.(*types.Task)
 		if taskEvent.Status.State == types.AuthRequired {
 			log.Debug("Encountered an auth-required task: breaking synchronous message/send flow.")

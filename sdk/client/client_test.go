@@ -159,7 +159,7 @@ func TestMessageStream(t *testing.T) {
 		{
 			name: "message stream",
 			params: types.MessageSendParam{
-				Message: &types.Message{Role: types.User},
+				Message: &types.Message{Role: types.User, Kind: types.EventTypeMessage},
 			},
 		},
 	}
@@ -177,7 +177,8 @@ func TestMessageStream(t *testing.T) {
 				writer.(http.Flusher).Flush()
 				events := []*types.Task{
 					{
-						Id: "123",
+						Id:   "123",
+						Kind: types.EventTypeTask,
 						Status: types.TaskStatus{
 							State: types.COMPLETED,
 						},
@@ -198,7 +199,7 @@ func TestMessageStream(t *testing.T) {
 			defer server.Close()
 
 			client := NewClient(http.DefaultClient, server.URL)
-			eventChan := make(chan any)
+			eventChan := make(chan types.Event)
 			errChan := make(chan error, 1)
 
 			go func() {
@@ -206,13 +207,10 @@ func TestMessageStream(t *testing.T) {
 				close(eventChan)
 			}()
 
-			var events []types.Task
+			var events []*types.Task
 			for event := range eventChan {
-				rawMsg, ok := event.(json.RawMessage)
+				task, ok := event.(*types.Task)
 				require.True(t, ok)
-				var task types.Task
-				err := json.Unmarshal(rawMsg, &task)
-				require.NoError(t, err)
 				events = append(events, task)
 			}
 			err := <-errChan

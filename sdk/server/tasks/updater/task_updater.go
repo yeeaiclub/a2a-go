@@ -43,6 +43,7 @@ func (t *TaskUpdater) UpdateStatus(state types.TaskState, opts ...TaskUpdaterOpt
 	}
 
 	updateEvent := &types.TaskStatusUpdateEvent{
+		Kind:      types.EventTypeStatusUpdate,
 		TaskId:    t.taskId,
 		ContextId: t.contextId,
 		Final:     option.final,
@@ -76,6 +77,7 @@ func (t *TaskUpdater) AddArtifact(parts []types.Part, opts ...TaskUpdaterOption)
 	}
 
 	artifactEvent := &types.TaskArtifactUpdateEvent{
+		Kind:      types.EventTypeArtifactUpdate,
 		TaskId:    t.taskId,
 		ContextId: t.contextId,
 		Artifact: &types.Artifact{
@@ -117,6 +119,7 @@ func (t *TaskUpdater) NewAgentMessage(parts []types.Part, opts ...TaskUpdaterOpt
 	}
 
 	return &types.Message{
+		Kind:      types.EventTypeMessage,
 		Role:      types.Agent,
 		TaskID:    t.taskId,
 		ContextID: t.contextId,

@@ -19,6 +19,20 @@ import (
 	"fmt"
 )
 
+// Part type constants
+const (
+	PartTypeText     = "text"
+	PartTypeFile     = "file"
+	PartTypeData     = "data"
+	PartTypeDocument = "document"
+)
+
+// FileContent type constants
+const (
+	FileContentTypeBytes = "bytes"
+	FileContentTypeUrl   = "url"
+)
+
 type Part interface {
 	GetKind() string
 	GetMetadata() map[string]any
@@ -38,7 +52,7 @@ type DataPart struct {
 }
 
 func (d *DataPart) GetKind() string {
-	return "data"
+	return PartTypeData
 }
 
 func (d *DataPart) GetMetadata() map[string]any {
@@ -52,7 +66,7 @@ type FilePart struct {
 }
 
 func (f *FilePart) GetKind() string {
-	return "file"
+	return PartTypeFile
 }
 
 func (f *FilePart) GetMetadata() map[string]any {
@@ -128,7 +142,7 @@ func (fb *FileWithBytes) GetName() string {
 }
 
 func (fb *FileWithBytes) GetKind() string {
-	return "bytes"
+	return FileContentTypeBytes
 }
 
 type FileWithUrl struct {
@@ -145,7 +159,7 @@ func (fu *FileWithUrl) GetName() string {
 }
 
 func (fu *FileWithUrl) GetKind() string {
-	return "url"
+	return FileContentTypeUrl
 }
 
 type TextPart struct {
@@ -155,51 +169,9 @@ type TextPart struct {
 }
 
 func (t *TextPart) GetKind() string {
-	return "text"
+	return PartTypeText
 }
 
 func (t *TextPart) GetMetadata() map[string]any {
 	return t.Metadata
-}
-
-// UnmarshalPart unmarshal a JSON object into the appropriate Part type
-func UnmarshalPart(data json.RawMessage) (Part, error) {
-	// First, try to determine the type by looking for specific fields
-	var probe struct {
-		Kind string          `json:"kind"`
-		Text string          `json:"text,omitempty"`
-		File json.RawMessage `json:"file,omitempty"`
-		Data map[string]any  `json:"data,omitempty"`
-	}
-
-	if err := json.Unmarshal(data, &probe); err != nil {
-		return nil, fmt.Errorf("failed to probe part structure: %w", err)
-	}
-
-	// Determine the type based on the presence of specific fields
-	switch {
-	case probe.Text != "":
-		// TextPart
-		var textPart TextPart
-		if err := json.Unmarshal(data, &textPart); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal TextPart: %w", err)
-		}
-		return &textPart, nil
-	case probe.File != nil:
-		// FilePart
-		var filePart FilePart
-		if err := json.Unmarshal(data, &filePart); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal FilePart: %w", err)
-		}
-		return &filePart, nil
-	case probe.Data != nil:
-		// DataPart
-		var dataPart DataPart
-		if err := json.Unmarshal(data, &dataPart); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal DataPart: %w", err)
-		}
-		return &dataPart, nil
-	default:
-		return nil, fmt.Errorf("unknown part type: %s", string(data))
-	}
 }

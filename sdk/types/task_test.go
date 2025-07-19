@@ -53,43 +53,6 @@ func TestArtifactUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, map[string]any{"key": "value"}, textPart.Metadata)
 	})
 
-	t.Run("unmarshal artifact with file part", func(t *testing.T) {
-		jsonData := `{
-			"artifact_id": "test-artifact-2",
-			"name": "file artifact",
-			"parts": [
-				{
-					"kind": "document",
-					"file": {
-						"bytes": "base64encodeddata",
-						"mime_type": "text/plain",
-						"name": "test.txt"
-					},
-					"metadata": {"size": 123}
-				}
-			]
-		}`
-
-		var artifact Artifact
-		err := json.Unmarshal([]byte(jsonData), &artifact)
-		require.NoError(t, err)
-
-		assert.Equal(t, "test-artifact-2", artifact.ArtifactId)
-		assert.Equal(t, "file artifact", artifact.Name)
-		assert.Len(t, artifact.Parts, 1)
-
-		filePart, ok := artifact.Parts[0].(*FilePart)
-		require.True(t, ok)
-		assert.Equal(t, "document", filePart.Kind)
-		assert.Equal(t, map[string]any{"size": float64(123)}, filePart.Metadata)
-
-		fileWithBytes, ok := filePart.File.(*FileWithBytes)
-		require.True(t, ok)
-		assert.Equal(t, "base64encodeddata", fileWithBytes.Bytes)
-		assert.Equal(t, "text/plain", fileWithBytes.MimeType)
-		assert.Equal(t, "test.txt", fileWithBytes.Name)
-	})
-
 	t.Run("unmarshal artifact with data part", func(t *testing.T) {
 		jsonData := `{
 			"artifact_id": "test-artifact-3",

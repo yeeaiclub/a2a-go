@@ -48,7 +48,7 @@ func (m *Message) GetContextId() string {
 	return m.ContextID
 }
 
-func (m *Message) Type() string {
+func (m *Message) GetKind() string {
 	return EventTypeMessage
 }
 
@@ -69,9 +69,9 @@ func (m *Message) UnmarshalJSON(data []byte) error {
 	}
 
 	kindMap := map[string]func() Part{
-		"text": func() Part { return &TextPart{} },
-		"data": func() Part { return &DataPart{} },
-		"file": func() Part { return &FilePart{} },
+		PartTypeText: func() Part { return &TextPart{} },
+		PartTypeData: func() Part { return &DataPart{} },
+		PartTypeFile: func() Part { return &FilePart{} },
 	}
 
 	parts, err := jsonx.UnmarshalSliceByKind(aux.Parts, kindMap)
