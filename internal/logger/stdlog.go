@@ -36,7 +36,7 @@ type stdImplementation struct {
 
 func newStdImplementation(out io.Writer) *stdImplementation {
 	return &stdImplementation{
-		logger: log.New(out, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.Lmicroseconds),
+		logger: log.New(out, "", log.Ldate|log.Ltime|log.Lmicroseconds),
 	}
 }
 
