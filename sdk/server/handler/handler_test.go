@@ -20,6 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yeeaiclub/a2a-go/internal/errs"
 	"github.com/yeeaiclub/a2a-go/sdk/server"
 	"github.com/yeeaiclub/a2a-go/sdk/server/event"
 	"github.com/yeeaiclub/a2a-go/sdk/server/execution"
@@ -105,10 +106,11 @@ func TestGatTask(t *testing.T) {
 
 func TestOnMessageSend(t *testing.T) {
 	testcases := []struct {
-		name   string
-		input  types.MessageSendParam
-		before func(store tasks.TaskStore)
-		want   types.Event
+		name    string
+		input   types.MessageSendParam
+		before  func(store tasks.TaskStore)
+		want    types.Event
+		wantErr error
 	}{
 		{
 			name:  "on message send",
@@ -120,6 +122,12 @@ func TestOnMessageSend(t *testing.T) {
 				require.NoError(t, err)
 			},
 			want: &types.Task{Id: "1", ContextId: "2", History: []*types.Message{{TaskID: "1", ContextID: "2"}}},
+		},
+		{
+			name:    "nil message send",
+			input:   types.MessageSendParam{Message: nil},
+			before:  func(store tasks.TaskStore) {},
+			wantErr: errs.ErrNilMessage,
 		},
 	}
 
@@ -133,6 +141,12 @@ func TestOnMessageSend(t *testing.T) {
 			ctx := server.NewCallContext(context.Background())
 			defer ctx.Release()
 			ev, err := handler.OnMessageSend(ctx, tc.input)
+
+			if tc.wantErr != nil {
+				require.ErrorIs(t, errs.ErrNilMessage, err)
+				return
+			}
+
 			require.NoError(t, err)
 
 			task, ok := ev.(*types.Task)
@@ -149,11 +163,12 @@ func TestOnMessageSend(t *testing.T) {
 
 func TestOnMessageSendStream(t *testing.T) {
 	testcases := []struct {
-		name   string
-		input  types.MessageSendParam
-		before func(store tasks.TaskStore)
-		after  func(events []types.Event)
-		want   []types.Event
+		name    string
+		input   types.MessageSendParam
+		before  func(store tasks.TaskStore)
+		after   func(events []types.Event)
+		want    []types.Event
+		wantErr error
 	}{
 		{
 			name:  "on message stream",
@@ -174,6 +189,12 @@ func TestOnMessageSendStream(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    "message is nil",
+			input:   types.MessageSendParam{Message: nil},
+			before:  func(store tasks.TaskStore) {},
+			wantErr: errs.ErrNilMessage,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -188,6 +209,11 @@ func TestOnMessageSendStream(t *testing.T) {
 			events := handler.OnMessageSendStream(ctx, tc.input)
 			var received []types.Event
 			for ev := range events {
+				if tc.wantErr != nil {
+					require.ErrorIs(t, tc.wantErr, tc.wantErr)
+					return
+				}
+
 				require.NoError(t, ev.Err)
 				received = append(received, ev.Event)
 			}
