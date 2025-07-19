@@ -17,6 +17,8 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/yeeaiclub/a2a-go/internal/jsonx"
 )
 
 type TaskState string
@@ -68,14 +70,22 @@ func (a *Artifact) UnmarshalJSON(data []byte) error {
 	a.Metadata = aux.Metadata
 	a.Name = aux.Name
 
-	// Unmarshal parts
-	a.Parts = make([]Part, len(aux.Parts))
-	for i, partData := range aux.Parts {
-		part, err := UnmarshalPart(partData)
-		if err != nil {
-			return fmt.Errorf("failed to unmarshal part %d: %w", i, err)
+	// Use UnmarshalSliceByKind to handle parts
+	if aux.Parts == nil {
+		a.Parts = []Part{}
+	} else {
+		kindMap := map[string]func() Part{
+			PartTypeText:     func() Part { return &TextPart{} },
+			PartTypeFile:     func() Part { return &FilePart{} },
+			PartTypeDocument: func() Part { return &FilePart{} }, // "document" maps to FilePart
+			PartTypeData:     func() Part { return &DataPart{} },
 		}
-		a.Parts[i] = part
+
+		parts, err := jsonx.UnmarshalSliceByKind(aux.Parts, kindMap)
+		if err != nil {
+			return fmt.Errorf("failed to unmarshal parts: %w", err)
+		}
+		a.Parts = parts
 	}
 
 	return nil
@@ -108,7 +118,7 @@ func (t *Task) GetTaskId() string {
 	return t.Id
 }
 
-func (t *Task) Type() string {
+func (t *Task) GetKind() string {
 	return EventTypeTask
 }
 

@@ -19,7 +19,7 @@ import "encoding/json"
 type Event interface {
 	GetTaskId() string
 	GetContextId() string
-	Type() string
+	GetKind() string
 	Done() bool
 }
 
@@ -42,7 +42,7 @@ func (t *TaskArtifactUpdateEvent) GetContextId() string {
 	return t.ContextId
 }
 
-func (t *TaskArtifactUpdateEvent) Type() string {
+func (t *TaskArtifactUpdateEvent) GetKind() string {
 	return EventTypeArtifactUpdate
 }
 
@@ -72,26 +72,22 @@ func (t *TaskStatusUpdateEvent) GetTaskId() string {
 	return t.TaskId
 }
 
-func (t *TaskStatusUpdateEvent) Type() string {
+func (t *TaskStatusUpdateEvent) GetKind() string {
 	return EventTypeStatusUpdate
 }
+
+// Event type constants for all event implementations
+const (
+	EventTypeStatusUpdate   = "status_update"
+	EventTypeArtifactUpdate = "artifact_update"
+	EventTypeTask           = "task"
+	EventTypeMessage        = "message"
+)
 
 type StreamEvent struct {
 	Type  EventType
 	Event Event
 	Err   error
-}
-
-func (s *StreamEvent) EncodeJSONRPC(encoder *json.Encoder, id string) error {
-	if s.Err != nil {
-		return encoder.Encode(InternalError())
-	}
-	successResp := JSONRPCSuccessResponse(id, s.Event)
-	err := encoder.Encode(successResp)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 type EventType int
@@ -104,10 +100,14 @@ const (
 	EventCanceled
 )
 
-// Event type constants for all event implementations
-const (
-	EventTypeStatusUpdate   = "status_update"
-	EventTypeArtifactUpdate = "artifact_update"
-	EventTypeTask           = "task"
-	EventTypeMessage        = "message"
-)
+func (s *StreamEvent) EncodeJSONRPC(encoder *json.Encoder, id string) error {
+	if s.Err != nil {
+		return encoder.Encode(InternalError())
+	}
+	successResp := JSONRPCSuccessResponse(id, s.Event)
+	err := encoder.Encode(successResp)
+	if err != nil {
+		return err
+	}
+	return nil
+}

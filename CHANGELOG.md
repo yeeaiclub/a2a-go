@@ -1,6 +1,8 @@
 # changelog
 
-## un release
+## new
+
+## v0.2.2
 1. Ensured final events are always enqueued and processed (#17)
 
 ## v0.2.1

@@ -93,7 +93,7 @@ func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.Mes
 		if d.IsTerminalTaskSates(task.Status.State) {
 			return nil, fmt.Errorf("task %s is in terminal state: %s", task.Id, task.Status.State)
 		}
-		task = taskManager.UpdateWithMessage(params.Message, task)
+		task = taskManager.PushMessageToHistory(params.Message, task)
 		if d.shouldAddPushInfo(params) {
 			err = d.pushNotifier.SetInfo(ctx, task.Id, params.Configuration.PushNotificationConfig)
 			if err != nil {
@@ -128,7 +128,7 @@ func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.Mes
 		return nil, err
 	}
 
-	if ev != nil && ev.Type() == "task" && ev.GetTaskId() != reqContext.TaskId {
+	if ev != nil && ev.GetKind() == types.EventTypeTask && ev.GetTaskId() != reqContext.TaskId {
 		return nil, errs.ErrTaskIdMissingMatch
 	}
 	return ev, nil
@@ -223,7 +223,7 @@ func (d *DefaultHandler) OnCancelTask(ctx *server.CallContext, params types.Task
 		return nil, err
 	}
 
-	if result.Type() == "task" {
+	if result.GetKind() == "task" {
 		return result.(*types.Task), nil
 	}
 	return nil, errs.ErrInValidResponse

@@ -143,7 +143,15 @@ func TestHandleMessageSendStream(t *testing.T) {
 			want: types.JSONRPCResponse{
 				Id:      "1",
 				JSONRPC: types.Version,
-				Result:  types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true, Status: types.TaskStatus{State: types.COMPLETED}},
+				Result: types.TaskStatusUpdateEvent{
+					TaskId:    "1",
+					Kind:      types.EventTypeStatusUpdate,
+					ContextId: "2",
+					Final:     true,
+					Status: types.TaskStatus{
+						State: types.COMPLETED,
+					},
+				},
 			},
 		},
 	}

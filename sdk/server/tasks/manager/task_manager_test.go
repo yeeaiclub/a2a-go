@@ -191,7 +191,8 @@ func TestTaskManager_EnsureTask(t *testing.T) {
 			initMessage: types.Message{Role: types.User, TaskID: "1", ContextID: "1", Kind: "init", MessageID: "msg-1"},
 			event:       &types.TaskStatusUpdateEvent{TaskId: "1"},
 			want: &types.Task{
-				Id: "1",
+				Id:   "1",
+				Kind: types.EventTypeTask,
 				Status: types.TaskStatus{
 					State: types.SUBMITTED,
 				},
@@ -286,13 +287,13 @@ func TestTaskManager_UpdateWithMessage(t *testing.T) {
 
 			task := tc.task
 			if tc.task.Status.Message != nil {
-				result := manager.UpdateWithMessage(&tc.message, &task)
+				result := manager.PushMessageToHistory(&tc.message, &task)
 				if assert.Len(t, result.History, 2) {
 					assert.Equal(t, tc.task.Status.Message.Role, result.History[0].Role)
 					assert.Equal(t, tc.message.Role, result.History[1].Role)
 				}
 			} else {
-				result := manager.UpdateWithMessage(&tc.message, &task)
+				result := manager.PushMessageToHistory(&tc.message, &task)
 				if assert.Len(t, result.History, 1) {
 					assert.Equal(t, tc.message.Role, result.History[0].Role)
 				}

@@ -164,7 +164,15 @@ func TestOnMessageSendStream(t *testing.T) {
 				err := store.Save(ctx, &types.Task{Id: "1", ContextId: "2"})
 				require.NoError(t, err)
 			},
-			want: []types.Event{&types.TaskStatusUpdateEvent{TaskId: "1", ContextId: "2", Final: true, Status: types.TaskStatus{State: types.COMPLETED}}},
+			want: []types.Event{
+				&types.TaskStatusUpdateEvent{
+					TaskId:    "1",
+					Kind:      types.EventTypeStatusUpdate,
+					ContextId: "2",
+					Final:     true,
+					Status:    types.TaskStatus{State: types.COMPLETED},
+				},
+			},
 		},
 	}
 
