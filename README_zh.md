@@ -38,8 +38,8 @@ go get github.com/yeeaiclub/a2a-go
 
 ## 客户端示例
 
-// 初始化带有自定义超时的 HTTP 客户端（可根据需要调整 config.Timeout）
 ```go
+// 初始化带有自定义超时的 HTTP 客户端（可根据需要调整 config.Timeout）
 httpClient := &http.Client{ Timeout: config.Timeout }
 
 // 使用 HTTP 客户端和 API 地址创建 a2a-go 客户端实例
@@ -49,8 +49,8 @@ a2aClient := client.NewClient(httpClient, "http://localhost:8080/api")
 
 > 上述代码演示了如何初始化 a2a-go 客户端。你需要传入自定义的 `http.Client`（可设置超时、代理等参数）以及 a2a 服务端的 API 地址。
 
-// 使用 a2a-go 客户端发送消息示例
 ```go
+// 使用 a2a-go 客户端发送消息示例
 resp, err := client.SendMessage(types.MessageSendParam{
     Message: &types.Message{
         TaskID: taskID,           // 消息所属的任务 ID
