@@ -38,8 +38,8 @@ go get github.com/yeeaiclub/a2a-go
 
 ## client
 
-// Initialize an HTTP client with a custom timeout (you can adjust config.Timeout as needed)
 ```go
+// Initialize an HTTP client with a custom timeout (you can adjust config.Timeout as needed)
 httpClient := &http.Client{ Timeout: config.Timeout }
 
 // Create a new a2a-go client instance using the HTTP client and the API base URL
@@ -49,8 +49,8 @@ a2aClient := client.NewClient(httpClient, "http://localhost:8080/api")
 
 > The above code demonstrates how to set up the a2a-go client. You need to provide a custom `http.Client` (for timeout, proxy, etc.) and the API endpoint of your a2a server.
 
-// Example: Sending a message using the a2a-go client
 ```go
+// Example: Sending a message using the a2a-go client
 resp, err := client.SendMessage(types.MessageSendParam{
     Message: &types.Message{
         TaskID: taskID,           // The ID of the task this message belongs to
