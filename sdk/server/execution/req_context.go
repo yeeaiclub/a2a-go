@@ -56,19 +56,21 @@ func NewRequestContext(options ...RequestContextOption) (*RequestContext, error)
 		reqContext.Params.Message.ContextID = cid
 	}
 
-	if reqContext.Task != nil {
-		if reqContext.Task.Id != "" && reqContext.Task.Id != tid {
-			return nil, errs.ErrBadTaskId
-		}
-		if reqContext.Task.ContextId != "" && reqContext.Task.ContextId != cid {
-			return nil, errs.ErrBadTaskId
-		}
+	return reqContext, validateTaskConsistency(reqContext, reqContext.TaskId, reqContext.ContextId)
+}
+
+func validateTaskConsistency(ctx *RequestContext, taskId, contextId string) error {
+	if ctx.Task == nil {
+		return nil
 	}
 
-	reqContext.TaskId = tid
-	reqContext.ContextId = cid
-
-	return reqContext, nil
+	if ctx.Task.Id != "" && ctx.Task.Id != taskId {
+		return errs.ErrBadTaskId
+	}
+	if ctx.Task.ContextId != "" && ctx.Task.ContextId != contextId {
+		return errs.ErrBadTaskId
+	}
+	return nil
 }
 
 type RequestContextOption interface {

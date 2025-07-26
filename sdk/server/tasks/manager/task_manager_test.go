@@ -80,7 +80,7 @@ func TestGetTask(t *testing.T) {
 			store := mocktasks.NewMockTaskStore(ctrl)
 			tc.setup(store)
 
-			manager := NewTaskManger(
+			manager := NewTaskManager(
 				store,
 				WithTaskId(tc.taskId),
 				WithContextId(tc.contextId),
@@ -149,7 +149,7 @@ func TestTaskManager_saveTask(t *testing.T) {
 			defer ctrl.Finish()
 			store := mocktasks.NewMockTaskStore(ctrl)
 			tc.setup(store)
-			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
+			manager := NewTaskManager(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
 			err := manager.saveTask(context.Background(), tc.task)
 			if tc.wantErr {
 				assert.Error(t, err)
@@ -243,7 +243,7 @@ func TestTaskManager_EnsureTask(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(store)
 			}
-			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId), WithInitMessage(&tc.initMessage))
+			manager := NewTaskManager(store, WithTaskId(tc.taskId), WithContextId(tc.contextId), WithInitMessage(&tc.initMessage))
 			task, err := manager.EnsureTask(context.Background(), tc.event)
 			if tc.wantErr {
 				assert.Error(t, err)
@@ -283,7 +283,7 @@ func TestTaskManager_UpdateWithMessage(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			store := mocktasks.NewMockTaskStore(ctrl)
-			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
+			manager := NewTaskManager(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
 
 			task := tc.task
 			if tc.task.Status.Message != nil {
@@ -340,7 +340,7 @@ func TestSaveTaskEvent(t *testing.T) {
 			if tc.setup != nil {
 				tc.setup(store)
 			}
-			manager := NewTaskManger(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
+			manager := NewTaskManager(store, WithTaskId(tc.taskId), WithContextId(tc.contextId))
 			result, err := manager.SaveTaskEvent(context.Background(), tc.event)
 			if tc.wantErr {
 				assert.Error(t, err)

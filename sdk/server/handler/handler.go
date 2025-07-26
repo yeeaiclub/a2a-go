@@ -48,7 +48,7 @@ type Handler interface {
 
 // DefaultHandler provides a default implementation of the Handler interface.
 type DefaultHandler struct {
-	manger           *manager.TaskManager         // Task manager for task lifecycle
+	manager          *manager.TaskManager         // Task manager for task lifecycle
 	store            tasks.TaskStore              // Task storage backend
 	queueManger      event.QueueManager           // Event queue manager
 	executor         execution.AgentExecutor      // Agent execution engine
@@ -70,7 +70,10 @@ func NewDefaultHandler(store tasks.TaskStore, executor execution.AgentExecutor, 
 func (d *DefaultHandler) OnGetTask(ctx *server.CallContext, params types.TaskQueryParams) (*types.Task, error) {
 	task, err := d.store.Get(ctx, params.Id)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get task %s form the store: %w", params.Id, err)
+	}
+	if task == nil {
+		return nil, errs.ErrTaskNotFound
 	}
 	return task, nil
 }
@@ -80,7 +83,7 @@ func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.Mes
 	if params.Message == nil {
 		return nil, errs.ErrNilMessage
 	}
-	taskManager := manager.NewTaskManger(
+	taskManager := manager.NewTaskManager(
 		d.store,
 		manager.WithTaskId(params.Message.TaskID),
 		manager.WithContextId(params.Message.ContextID),
@@ -122,11 +125,9 @@ func (d *DefaultHandler) OnMessageSend(ctx *server.CallContext, params types.Mes
 	}
 
 	d.execute(ctx, reqContext, queue)
-	resultAggregator := aggregator.NewResultAggregator(
-		taskManager,
-		aggregator.WithBatchSize(10),
-	)
-	ev, err := resultAggregator.ConsumeAndBreakOnInterrupt(ctx, queue)
+	ev, err := aggregator.NewResultAggregator(taskManager).
+		BuildInterruptible().
+		Consume(ctx, queue)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +151,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx *server.CallContext, params typ
 		return errorStream(errs.ErrNilMessage)
 	}
 
-	taskManager := manager.NewTaskManger(
+	taskManager := manager.NewTaskManager(
 		d.store,
 		manager.WithTaskId(params.Message.TaskID),
 		manager.WithContextId(params.Message.ContextID),
@@ -180,8 +181,7 @@ func (d *DefaultHandler) OnMessageSendStream(ctx *server.CallContext, params typ
 
 	d.execute(ctx, reqContext, queue)
 
-	resultAggregator := aggregator.NewResultAggregator(taskManager, aggregator.WithBatchSize(10))
-	return resultAggregator.ConsumeAndEmit(ctx, queue)
+	return aggregator.NewResultAggregator(taskManager).BuildStreaming().Consume(ctx, queue)
 }
 
 // OnCancelTask handles task cancellation requests.
@@ -199,13 +199,12 @@ func (d *DefaultHandler) OnCancelTask(ctx *server.CallContext, params types.Task
 		return nil, errs.ErrTaskNotFound
 	}
 
-	taskManager := manager.NewTaskManger(
+	taskManager := manager.NewTaskManager(
 		d.store,
 		manager.WithTaskId(task.Id),
 		manager.WithContextId(task.ContextId),
 	)
 
-	rg := aggregator.NewResultAggregator(taskManager, aggregator.WithBatchSize(10))
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
 	if err != nil {
 		return nil, err
@@ -225,7 +224,9 @@ func (d *DefaultHandler) OnCancelTask(ctx *server.CallContext, params types.Task
 	}
 
 	d.cancel(ctx, reqCtx, queue)
-	result, err := rg.ConsumeAll(ctx, queue)
+	result, err := aggregator.NewResultAggregator(taskManager).
+		BuildFull().
+		Consume(ctx, queue)
 	if err != nil {
 		return nil, err
 	}
@@ -295,17 +296,18 @@ func (d *DefaultHandler) OnResubscribeToTask(ctx *server.CallContext, params typ
 		return errorStream(errs.ErrTaskNotFound)
 	}
 
-	taskManager := manager.NewTaskManger(
+	taskManager := manager.NewTaskManager(
 		d.store,
 		manager.WithTaskId(task.Id),
 		manager.WithContextId(task.ContextId),
 	)
-	resultAggregator := aggregator.NewResultAggregator(taskManager, aggregator.WithBatchSize(10))
 	queue, err := d.queueManger.CreateOrTap(ctx, task.Id)
 	if err != nil {
 		return errorStream(err)
 	}
-	return resultAggregator.ConsumeAndEmit(ctx, queue)
+	return aggregator.NewResultAggregator(taskManager).
+		BuildStreaming().
+		Consume(ctx, queue)
 }
 
 // execute runs the agent executor in a goroutine and closes the queue on completion.
@@ -351,15 +353,15 @@ func (fn HandlerOptionFunc) Option(d *DefaultHandler) {
 	fn(d)
 }
 
-// WithTaskManger sets a custom TaskManager for the handler.
-func WithTaskManger(taskManger *manager.TaskManager) HandlerOption {
+// WithTaskManager sets a custom TaskManager for the handler.
+func WithTaskManager(taskManger *manager.TaskManager) HandlerOption {
 	return HandlerOptionFunc(func(d *DefaultHandler) {
-		d.manger = taskManger
+		d.manager = taskManger
 	})
 }
 
-// WithQueueManger sets a custom QueueManager for the handler.
-func WithQueueManger(queueManger event.QueueManager) HandlerOption {
+// WithQueueManager sets a custom QueueManager for the handler.
+func WithQueueManager(queueManger event.QueueManager) HandlerOption {
 	return HandlerOptionFunc(func(d *DefaultHandler) {
 		d.queueManger = queueManger
 	})

@@ -64,8 +64,8 @@ func WithInitMessage(message *types.Message) TaskManagerOption {
 	})
 }
 
-// NewTaskManger creates a new TaskManager with the given store and options.
-func NewTaskManger(store tasks.TaskStore, opts ...TaskManagerOption) *TaskManager {
+// NewTaskManager creates a new TaskManager with the given store and options.
+func NewTaskManager(store tasks.TaskStore, opts ...TaskManagerOption) *TaskManager {
 	manger := &TaskManager{store: store}
 
 	for _, opt := range opts {

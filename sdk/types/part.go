@@ -14,23 +14,11 @@
 
 package types
 
-import (
-	"encoding/json"
-	"fmt"
-)
-
 // Part type constants
 const (
-	PartTypeText     = "text"
-	PartTypeFile     = "file"
-	PartTypeData     = "data"
-	PartTypeDocument = "document"
-)
-
-// FileContent type constants
-const (
-	FileContentTypeBytes = "bytes"
-	FileContentTypeUrl   = "url"
+	PartTypeText = "text"
+	PartTypeFile = "file"
+	PartTypeData = "data"
 )
 
 type Part interface {
@@ -38,10 +26,11 @@ type Part interface {
 	GetMetadata() map[string]any
 }
 
-type FileContent interface {
-	GetMimeType() string
-	GetName() string
-	GetKind() string
+type FileContent struct {
+	MimeType string `json:"mime_type,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Bytes    string `json:"bytes,omitempty"`
+	Url      string `json:"url,omitempty"`
 }
 
 // DataPart Represents a structured data segment within a message part.
@@ -62,6 +51,8 @@ func (d *DataPart) GetMetadata() map[string]any {
 type FilePart struct {
 	File     FileContent    `json:"file"`
 	Kind     string         `json:"kind,omitempty"`
+	Bytes    string         `json:"bytes,omitempty"`
+	Url      string         `json:"url,omitempty"`
 	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
@@ -71,95 +62,6 @@ func (f *FilePart) GetKind() string {
 
 func (f *FilePart) GetMetadata() map[string]any {
 	return f.Metadata
-}
-
-func UnmarshalFileContent(data json.RawMessage) (FileContent, error) {
-	var probe struct {
-		Bytes *string `json:"bytes,omitempty"`
-		Url   *string `json:"url,omitempty"`
-	}
-	if err := json.Unmarshal(data, &probe); err != nil {
-		return nil, fmt.Errorf("failed to probe file content: %w", err)
-	}
-
-	switch {
-	case probe.Bytes != nil:
-		var withBytes FileWithBytes
-		if err := json.Unmarshal(data, &withBytes); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal FileWithBytes: %w", err)
-		}
-		return &withBytes, nil
-	case probe.Url != nil:
-		var withUrl FileWithUrl
-		if err := json.Unmarshal(data, &withUrl); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal FileWithUrl: %w", err)
-		}
-		return &withUrl, nil
-	default:
-		return nil, fmt.Errorf("unknown file content type")
-	}
-}
-
-func (f *FilePart) UnmarshalJSON(data []byte) error {
-	aux := &struct {
-		File     json.RawMessage `json:"file"`
-		Kind     string          `json:"kind,omitempty"`
-		Metadata map[string]any  `json:"metadata,omitempty"`
-	}{}
-
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
-
-	f.Kind = aux.Kind
-	f.Metadata = aux.Metadata
-
-	fileContent, err := UnmarshalFileContent(aux.File)
-	if err != nil {
-		return fmt.Errorf("failed to unmarshal file content: %w", err)
-	}
-
-	f.File = fileContent
-	return nil
-}
-
-type FileBase struct {
-	MimeType string `json:"mime_type,omitempty"`
-	Name     string `json:"name,omitempty"`
-}
-
-type FileWithBytes struct {
-	FileBase
-	Bytes string `json:"bytes,omitempty"`
-}
-
-func (fb *FileWithBytes) GetMimeType() string {
-	return fb.MimeType
-}
-
-func (fb *FileWithBytes) GetName() string {
-	return fb.Name
-}
-
-func (fb *FileWithBytes) GetKind() string {
-	return FileContentTypeBytes
-}
-
-type FileWithUrl struct {
-	FileBase
-	Url string `json:"url,omitempty"`
-}
-
-func (fu *FileWithUrl) GetMimeType() string {
-	return fu.MimeType
-}
-
-func (fu *FileWithUrl) GetName() string {
-	return fu.Name
-}
-
-func (fu *FileWithUrl) GetKind() string {
-	return FileContentTypeUrl
 }
 
 type TextPart struct {
