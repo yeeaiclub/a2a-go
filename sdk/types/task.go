@@ -75,10 +75,9 @@ func (a *Artifact) UnmarshalJSON(data []byte) error {
 		a.Parts = []Part{}
 	} else {
 		kindMap := map[string]func() Part{
-			PartTypeText:     func() Part { return &TextPart{} },
-			PartTypeFile:     func() Part { return &FilePart{} },
-			PartTypeDocument: func() Part { return &FilePart{} }, // "document" maps to FilePart
-			PartTypeData:     func() Part { return &DataPart{} },
+			PartTypeText: func() Part { return &TextPart{} },
+			PartTypeFile: func() Part { return &FilePart{} },
+			PartTypeData: func() Part { return &DataPart{} },
 		}
 
 		parts, err := jsonx.UnmarshalSliceByKind(aux.Parts, kindMap)

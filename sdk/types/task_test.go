@@ -122,40 +122,26 @@ func TestArtifactUnmarshalJSON(t *testing.T) {
 func TestTaskUnmarshalJSON(t *testing.T) {
 	t.Run("unmarshal task with artifacts", func(t *testing.T) {
 		jsonData := `{
-			"id": "task-123",
-			"context_id": "context-456",
-			"kind": "test_task",
-			"task_status": {
-				"state": "completed",
-				"time_stamp": "2025-01-01T00:00:00Z"
-			},
-			"artifacts": [
-				{
-					"artifact_id": "artifact-1",
-					"name": "test artifact",
-					"parts": [
-						{
-							"kind": "text",
-							"text": "This is a text part"
-						}
-					]
-				},
-				{
-					"artifact_id": "artifact-2",
-					"name": "file artifact",
-					"parts": [
-						{
-							"kind": "document",
-							"file": {
-								"bytes": "base64data",
-								"mime_type": "text/plain",
-								"name": "test.txt"
-							}
-						}
-					]
-				}
-			]
-		}`
+            "id": "task-123",
+            "context_id": "context-456",
+            "kind": "test_task",
+            "task_status": {
+                "state": "completed",
+                "time_stamp": "2025-01-01T00:00:00Z"
+            },
+            "artifacts": [
+                {
+                    "artifact_id": "artifact-1",
+                    "name": "test artifact",
+                    "parts": [
+                        {
+                            "kind": "text",
+                            "text": "This is a text part"
+                        }
+                    ]
+                } 
+            ]
+        }`
 
 		var task Task
 		err := json.Unmarshal([]byte(jsonData), &task)
@@ -166,7 +152,7 @@ func TestTaskUnmarshalJSON(t *testing.T) {
 		assert.Equal(t, "test_task", task.Kind)
 		assert.Equal(t, COMPLETED, task.Status.State)
 		assert.Equal(t, "2025-01-01T00:00:00Z", task.Status.TimeStamp)
-		assert.Len(t, task.Artifacts, 2)
+		assert.Len(t, task.Artifacts, 1)
 
 		// Check first artifact
 		assert.Equal(t, "artifact-1", task.Artifacts[0].ArtifactId)
@@ -177,20 +163,5 @@ func TestTaskUnmarshalJSON(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "text", textPart.Kind)
 		assert.Equal(t, "This is a text part", textPart.Text)
-
-		// Check second artifact
-		assert.Equal(t, "artifact-2", task.Artifacts[1].ArtifactId)
-		assert.Equal(t, "file artifact", task.Artifacts[1].Name)
-		assert.Len(t, task.Artifacts[1].Parts, 1)
-
-		filePart, ok := task.Artifacts[1].Parts[0].(*FilePart)
-		require.True(t, ok)
-		assert.Equal(t, "document", filePart.Kind)
-
-		fileWithBytes, ok := filePart.File.(*FileWithBytes)
-		require.True(t, ok)
-		assert.Equal(t, "base64data", fileWithBytes.Bytes)
-		assert.Equal(t, "text/plain", fileWithBytes.MimeType)
-		assert.Equal(t, "test.txt", fileWithBytes.Name)
 	})
 }

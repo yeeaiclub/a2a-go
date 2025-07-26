@@ -55,13 +55,12 @@ func TestConsumeAll(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(queue, store)
 
-			taskManger := manager.NewTaskManger(
+			taskManger := manager.NewTaskManager(
 				store,
 				manager.WithTaskId("1"),
 				manager.WithContextId("2"))
 
-			aggregator := NewResultAggregator(taskManger)
-			all, err := aggregator.ConsumeAll(context.Background(), queue)
+			all, err := NewResultAggregator(taskManger).BuildFull().Consume(context.Background(), queue)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, all)
 		})
@@ -96,13 +95,15 @@ func TestConsumeAndEmit(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(queue, store)
 
-			taskManger := manager.NewTaskManger(
+			taskManger := manager.NewTaskManager(
 				store,
 				manager.WithTaskId("1"),
 				manager.WithContextId("2"))
 			aggregator := NewResultAggregator(taskManger)
 
-			events := aggregator.ConsumeAndEmit(context.Background(), queue)
+			events := aggregator.
+				BuildStreaming().
+				Consume(context.Background(), queue)
 
 			var received []types.StreamEvent
 			for ev := range events {
@@ -156,12 +157,12 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(queue, store)
 
-			taskManger := manager.NewTaskManger(
+			taskManger := manager.NewTaskManager(
 				store,
 				manager.WithTaskId("1"),
 				manager.WithContextId("2"))
 			aggregator := NewResultAggregator(taskManger)
-			events, err := aggregator.ConsumeAndBreakOnInterrupt(context.Background(), queue)
+			events, err := aggregator.BuildInterruptible().Consume(context.Background(), queue)
 			if tc.expectError != nil {
 				require.ErrorIs(t, err, tc.expectError)
 				return

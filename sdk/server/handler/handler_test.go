@@ -137,7 +137,7 @@ func TestOnMessageSend(t *testing.T) {
 			tc.before(store)
 			executor := newExecutor()
 			manger := QueueManger{}
-			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
+			handler := NewDefaultHandler(store, executor, WithQueueManager(manger))
 			ctx := server.NewCallContext(context.Background())
 			defer ctx.Release()
 			ev, err := handler.OnMessageSend(ctx, tc.input)
@@ -203,7 +203,7 @@ func TestOnMessageSendStream(t *testing.T) {
 			tc.before(store)
 			executor := newExecutor()
 			manager := QueueManger{}
-			handler := NewDefaultHandler(store, executor, WithQueueManger(manager))
+			handler := NewDefaultHandler(store, executor, WithQueueManager(manager))
 			ctx := server.NewCallContext(context.Background())
 			defer ctx.Release()
 			events := handler.OnMessageSendStream(ctx, tc.input)
@@ -255,7 +255,7 @@ func TestOnCancelTask(t *testing.T) {
 			tc.before(store)
 			executor := newExecutor()
 			manger := QueueManger{}
-			handler := NewDefaultHandler(store, executor, WithQueueManger(manger))
+			handler := NewDefaultHandler(store, executor, WithQueueManager(manger))
 			ctx := server.NewCallContext(context.Background())
 			defer ctx.Release()
 			task, err := handler.OnCancelTask(ctx, tc.input)

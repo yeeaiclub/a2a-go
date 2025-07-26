@@ -93,7 +93,7 @@ func TestHandleMessageSend(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(store)
 			executor := newExecutor()
-			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
+			handler := NewDefaultHandler(store, executor, WithQueueManager(QueueManger{}))
 			server := NewServer("/card", "/", mockAgentCard, handler)
 			request := types.JSONRPCRequest{
 				Id:     "1",
@@ -161,7 +161,7 @@ func TestHandleMessageSendStream(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(store)
 			executor := newExecutor()
-			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
+			handler := NewDefaultHandler(store, executor, WithQueueManager(QueueManger{}))
 			server := NewServer("/card", "/", mockAgentCard, handler)
 			request := types.JSONRPCRequest{
 				Id:     "1",
@@ -222,7 +222,7 @@ func TestHandleGetTask(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			tc.before(store)
 			executor := newExecutor()
-			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
+			handler := NewDefaultHandler(store, executor, WithQueueManager(QueueManger{}))
 			server := NewServer("/card", "/", mockAgentCard, handler)
 
 			request := types.JSONRPCRequest{
@@ -262,7 +262,7 @@ func TestGetCard(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			store := tasks.NewInMemoryTaskStore()
 			executor := newExecutor()
-			handler := NewDefaultHandler(store, executor, WithQueueManger(QueueManger{}))
+			handler := NewDefaultHandler(store, executor, WithQueueManager(QueueManger{}))
 
 			server := NewServer("/", "/card", mockAgentCard, handler)
 

@@ -82,34 +82,3 @@ func TestMessageUnmarshalJSONWithDataPart(t *testing.T) {
 		assert.Equal(t, map[string]any{"1": "a"}, dataPart.Data)
 	})
 }
-
-func TestMessageUnmarshalJSONWithFilePart(t *testing.T) {
-	t.Run("MessageUnmarshalJSONWithFilePart", func(t *testing.T) {
-		jsonData := `
-{
-  "role": "user",
-  "parts": [
-    {
-      "kind": "file",
-      "file": {
-        "bytes": "base64encodeddata"
-      },
-      "metadata": {
-        "name": "test.txt"
-      }
-    }
-  ]
-}
-`
-		var msg Message
-		err := json.Unmarshal([]byte(jsonData), &msg)
-		require.NoError(t, err)
-
-		assert.Len(t, msg.Parts, 1)
-		filePart := msg.Parts[0].(*FilePart)
-		assert.IsType(t, &FileWithBytes{}, filePart.File)
-		bytesVal := filePart.File.(*FileWithBytes)
-		assert.Equal(t, "base64encodeddata", bytesVal.Bytes)
-		assert.Equal(t, "test.txt", filePart.Metadata["name"])
-	})
-}

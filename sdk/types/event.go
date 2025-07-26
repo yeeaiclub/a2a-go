@@ -16,6 +16,14 @@ package types
 
 import "encoding/json"
 
+// Event type constants for all event implementations
+const (
+	EventTypeStatusUpdate   = "status_update"
+	EventTypeArtifactUpdate = "artifact_update"
+	EventTypeTask           = "task"
+	EventTypeMessage        = "message"
+)
+
 type Event interface {
 	GetTaskId() string
 	GetContextId() string
@@ -75,14 +83,6 @@ func (t *TaskStatusUpdateEvent) GetTaskId() string {
 func (t *TaskStatusUpdateEvent) GetKind() string {
 	return EventTypeStatusUpdate
 }
-
-// Event type constants for all event implementations
-const (
-	EventTypeStatusUpdate   = "status_update"
-	EventTypeArtifactUpdate = "artifact_update"
-	EventTypeTask           = "task"
-	EventTypeMessage        = "message"
-)
 
 type StreamEvent struct {
 	Type  EventType
