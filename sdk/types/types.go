@@ -37,7 +37,7 @@ type AgentProvider struct {
 }
 
 type AgentSkill struct {
-	Id          string   `json:"id,omitempty"`
+	ID          string   `json:"id,omitempty"`
 	Description string   `json:"description,omitempty"`
 	Examples    []string `json:"examples,omitempty"`
 	InputModes  []string `json:"input_modes,omitempty"`

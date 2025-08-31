@@ -21,7 +21,7 @@ var (
 	ErrTaskNotFound         = errors.New("task not found")
 	ErrInValidResponse      = errors.New("agent did not return valid response for cancel")
 	ErrAuthRequired         = errors.New("authentication required")
-	ErrTaskIdMissingMatch   = errors.New("task Id mismatch in agent response")
+	ErrTaskIdMissingMatch   = errors.New("task ID mismatch in agent response")
 	ErrBadTaskId            = errors.New("bad task id: task id in request does not match the task object")
 	ErrNilMessage           = errors.New("message is nil")
 )

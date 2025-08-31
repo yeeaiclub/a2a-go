@@ -39,7 +39,7 @@ func TestGetAgentCard(t *testing.T) {
 				DefaultOutputModes: []string{"text"},
 				Version:            "1.0.0",
 				Skills: []types.AgentSkill{
-					{Id: "1", Description: "return hello", Name: "hello, word", Tags: []string{"hello, word"}},
+					{ID: "1", Description: "return hello", Name: "hello, word", Tags: []string{"hello, word"}},
 				},
 			},
 		},

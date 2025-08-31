@@ -40,7 +40,7 @@ var mockAgentCard = types.AgentCard{
 	},
 	Skills: []types.AgentSkill{
 		{
-			Id:          "test-skills",
+			ID:          "test-skills",
 			Name:        "test skill",
 			Description: "a test skill for unit test",
 			InputModes:  []string{"text/plain"},
