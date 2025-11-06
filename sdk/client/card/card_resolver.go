@@ -18,10 +18,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	log "github.com/yeeaiclub/a2a-go/internal/logger"
-	"github.com/yeeaiclub/a2a-go/sdk/types"
 	"net/http"
 	"net/url"
+
+	log "github.com/yeeaiclub/a2a-go/internal/logger"
+	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
 
 // A2ACardResolver is responsible for retrieving agent card information from a specified endpoint.
