@@ -1,8 +1,14 @@
 # changelog
 
+## v0.2.4
+
+- move card resolver to client/card package (#33)
+- Rename `WithOptions` to `WithHeaders` in card_resolver (#33)
+- Improved the error message for `GetCard()` in card_resolver (#33)
+
 ## v0.2.3
 
-fix: add nil check for message in MessageSend and MessageSendStream to prevent panic(#20)
+- fix: add nil check for message in MessageSend and MessageSendStream to prevent panic(#20)
 
 ## v0.2.2
 1. Ensured final events are always enqueued and processed (#17)
