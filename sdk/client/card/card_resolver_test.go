@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package client
+package card
 
 import (
 	"encoding/json"
@@ -28,11 +28,11 @@ import (
 func TestGetAgentCard(t *testing.T) {
 	testcases := []struct {
 		name string
-		want types.AgentCard
+		want *types.AgentCard
 	}{
 		{
 			name: "success response",
-			want: types.AgentCard{
+			want: &types.AgentCard{
 				Name:               "hello, word",
 				Description:        "a hello word agent",
 				DefaultInputModes:  []string{"text"},
@@ -57,7 +57,7 @@ func TestGetAgentCard(t *testing.T) {
 				http.DefaultClient,
 				server.URL,
 			)
-			card, err := resolver.GetAgentCard()
+			card, err := resolver.GetAgentCard(t.Context())
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, card)
 		})
