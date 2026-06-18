@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 
+	log "github.com/yeeaiclub/a2a-go/internal/logger"
 	"github.com/yeeaiclub/a2a-go/sdk/server/tasks"
 	"github.com/yeeaiclub/a2a-go/sdk/types"
 )
@@ -30,38 +31,6 @@ type TaskManager struct {
 	store       tasks.TaskStore // Task storage backend
 	initMessage *types.Message  // Initial message for the task
 	currentTask *types.Task     // Cached current task
-}
-
-// TaskManagerOption is an option for configuring TaskManager.
-type TaskManagerOption interface {
-	Option(manager *TaskManager)
-}
-
-type TaskManagerOptionFunc func(manager *TaskManager)
-
-func (fn TaskManagerOptionFunc) Option(manger *TaskManager) {
-	fn(manger)
-}
-
-// WithTaskId sets the task ID for the TaskManager.
-func WithTaskId(taskId string) TaskManagerOption {
-	return TaskManagerOptionFunc(func(manger *TaskManager) {
-		manger.taskId = taskId
-	})
-}
-
-// WithContextId sets the context ID for the TaskManager.
-func WithContextId(contextId string) TaskManagerOption {
-	return TaskManagerOptionFunc(func(manger *TaskManager) {
-		manger.contextId = contextId
-	})
-}
-
-// WithInitMessage sets the initial message for the TaskManager.
-func WithInitMessage(message *types.Message) TaskManagerOption {
-	return TaskManagerOptionFunc(func(manger *TaskManager) {
-		manger.initMessage = message
-	})
 }
 
 // NewTaskManager creates a new TaskManager with the given store and options.
@@ -76,6 +45,10 @@ func NewTaskManager(store tasks.TaskStore, opts ...TaskManagerOption) *TaskManag
 
 // GetTask retrieves the current task, either from memory or from the store.
 func (t *TaskManager) GetTask(ctx context.Context) (*types.Task, error) {
+	if t.taskId == "" {
+		log.Debug("task id not set, cannot get task.")
+		return nil, nil
+	}
 	if t.currentTask != nil {
 		return t.currentTask, nil
 	}

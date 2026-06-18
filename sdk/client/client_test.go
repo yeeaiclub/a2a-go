@@ -277,7 +277,8 @@ func TestApply(t *testing.T) {
 							In:   types.InHeader,
 							Name: "X-API-Key",
 						},
-					})
+					},
+				)
 				ctx.Set("sessionId", "session1")
 				req, _ := http.NewRequest(http.MethodGet, "http://example.com", nil)
 				ctx.SetRequest(req)

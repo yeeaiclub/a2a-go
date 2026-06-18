@@ -58,7 +58,8 @@ func TestConsumeAll(t *testing.T) {
 			taskManger := manager.NewTaskManager(
 				store,
 				manager.WithTaskId("1"),
-				manager.WithContextId("2"))
+				manager.WithContextId("2"),
+			)
 
 			all, err := NewResultAggregator(taskManger).BuildFull().Consume(context.Background(), queue)
 			require.NoError(t, err)
@@ -98,7 +99,8 @@ func TestConsumeAndEmit(t *testing.T) {
 			taskManger := manager.NewTaskManager(
 				store,
 				manager.WithTaskId("1"),
-				manager.WithContextId("2"))
+				manager.WithContextId("2"),
+			)
 			aggregator := NewResultAggregator(taskManger)
 
 			events := aggregator.
@@ -160,7 +162,8 @@ func TestConsumeAndBreakOnInterrupt(t *testing.T) {
 			taskManger := manager.NewTaskManager(
 				store,
 				manager.WithTaskId("1"),
-				manager.WithContextId("2"))
+				manager.WithContextId("2"),
+			)
 			aggregator := NewResultAggregator(taskManger)
 			events, err := aggregator.BuildInterruptible().Consume(context.Background(), queue)
 			if tc.expectError != nil {
